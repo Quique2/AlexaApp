@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MaterialType {
+  LUPULO
+  MALTA
+  YEAST
+  ADJUNTO
+  OTRO
+}
+
+enum AlertStatus {
+  RED
+  YELLOW
+  GREEN
+  NONE
+}
+
+enum OrderStatus {
+  PENDING
+  IN_TRANSIT
+  RECEIVED_COMPLETE
+  RECEIVED_PARTIAL
+  CANCELLED
+}
+
+enum PaymentMethod {
+  TRANSFER
+  SUPPLIER_CREDIT
+  CASH
+  CARD
+  OTHER
+}
+
+enum ReceptionCondition {
+  GOOD
+  REGULAR
+  DAMAGED
+  INCOMPLETE
+  EXPIRED
+}
+
+model Supplier {
+  id                   String     @id
+  name                 String
+  country              String?
+  materialType         String?
+  daysToOrder          Int        @default(7)
+  estimatedDeliveryDays Int       @default(7)
+  minOrderQuantity     Float?
+  minOrderUnit         String?
+  hasCredit            Boolean    @default(false)
+  notes                String?
+  materials            Material[]
+  orders               Order[]
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@map("suppliers")
+}
+
+model Material {
+  id          String        @id
+  name        String
+  type        MaterialType
+  brand       String?
+  unit        String
+  unitPrice   Float         @default(0)
+  supplierId  String?
+  supplier    Supplier?     @relation(fields: [supplierId], references: [id])
+  inventory   Inventory?
+  orders      Order[]
+  recipeLines RecipeLine[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("materials")
+}
+
+model RecipeLine {
+  id          String   @id @default(uuid())
+  beerStyle   String
+  materialId  String
+  material    Material @relation(fields: [materialId], references: [id])
+  qtyPerBatch Float
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  @@unique([beerStyle, materialId])
+  @@map("recipe_lines")
+}
+
+model Inventory {
+  id                 String      @id @default(uuid())
+  materialId         String      @unique
+  material           Material    @relation(fields: [materialId], references: [id])
+  currentStock       Float       @default(0)
+  dailyConsumption   Float       @default(0)
+  reorderPointDays   Int         @default(7)
+  alertStatus        AlertStatus @default(NONE)
+  quantityToOrder    Float       @default(0)
+  estimatedOrderCost Float       @default(0)
+  notes              String?
+  updatedAt          DateTime    @updatedAt
+
+  @@map("inventory")
+}
+
+model ProductionPlan {
+  id             String    @id @default(uuid())
+  productionDate DateTime
+  style          String
+  plannedBatches Int       @default(1)
+  maltKgPerBatch Float     @default(0)
+  hopKgPerBatch  Float     @default(0)
+  yeastGPerBatch Float     @default(0)
+  totalMaltKg    Float     @default(0)
+  totalHopKg     Float     @default(0)
+  totalYeastG    Float     @default(0)
+  notes          String?
+  orderedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("production_plans")
+}
+
+model Order {
+  id                   String        @id @default(uuid())
+  folio                String        @unique
+  orderDate            DateTime
+  materialId           String
+  material             Material      @relation(fields: [materialId], references: [id])
+  supplierId           String?
+  supplier             Supplier?     @relation(fields: [supplierId], references: [id])
+  orderedQuantity      Float
+  totalPaid            Float?
+  paymentMethod        PaymentMethod?
+  estimatedArrivalDate DateTime?
+  status               OrderStatus   @default(PENDING)
+  month                String
+  notes                String?
+  receptions           Reception[]
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@map("orders")
+}
+
+model Reception {
+  id               String             @id @default(uuid())
+  receptionDate    DateTime
+  orderId          String
+  order            Order              @relation(fields: [orderId], references: [id])
+  receivedQuantity Float
+  condition        ReceptionCondition @default(GOOD)
+  isConforming     Boolean            @default(true)
+  batchLot         String?
+  receivedBy       String?
+  notes            String?
+  createdAt        DateTime           @default(now())
+
+  @@map("receptions")
+}
+
+model JITConfig {
+  id                   Int      @id @default(1)
+  workingDaysPerWeek   Int      @default(5)
+  maxDaysRawMaterial   Int      @default(7)
+  hopCoverageDays      Int      @default(90)
+  yeastCoverageDays    Int      @default(15)
+  safetyBufferDays     Int      @default(1)
+  avgDailyProduction   Float    @default(1)
+  updatedAt            DateTime @updatedAt
+
+  @@map("jit_config")
+}

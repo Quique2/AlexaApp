@@ -1,0 +1,22 @@
+{
+  "name": "rrey-app",
+  "version": "1.0.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "workspaces": [
+    "api",
+    "app"
+  ],
+  "scripts": {
+    "api": "npm run dev --workspace=api",
+    "app": "npm start --workspace=app",
+    "install:all": "npm install",
+    "db:push": "npm run db:push --workspace=api",
+    "db:seed": "npm run db:seed --workspace=api",
+    "import:excel": "npm run import:excel --workspace=api"
+  },
+  "dependencies": {
+    "babel-plugin-module-resolver": "^5.0.3",
+    "react-native-worklets": "^0.5.1"
+  }
+}

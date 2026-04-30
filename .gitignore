@@ -39,3 +39,28 @@ logs/
 
 # Node
 node_modules/
+npm-debug.log*
+
+# TypeScript
+dist/
+*.tsbuildinfo
+
+# Expo
+.expo/
+app/.expo/
+app/dist/
+app/.env
+
+# Prisma
+api/prisma/dev.db
+api/prisma/dev.db-journal
+api/.env
+
+# Claude memory
+.claude/
+
+# One-off scripts / assets
+inspect_excel.js
+inspect_excel2.js
+download.png
+Inventario_Rrey_v4.xlsx
