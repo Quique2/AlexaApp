@@ -94,6 +94,7 @@ export default function InventoryScreen() {
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <InventoryRow item={item} onPress={handlePress} />}
+        contentContainerStyle={{ paddingBottom: 20 }}
         refreshControl={
           <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.gold} />
         }

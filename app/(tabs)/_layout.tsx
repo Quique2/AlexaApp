@@ -30,12 +30,11 @@ export default function TabLayout() {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          paddingTop: 4,
-          height: 60,
+          paddingTop: 6,
         },
         tabBarActiveTintColor: colors.gold,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: { ...typography.caption, marginBottom: 4, fontSize: 10 },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "500" as const, marginBottom: 6 },
       }}
     >
       <Tabs.Screen

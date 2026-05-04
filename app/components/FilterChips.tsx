@@ -39,10 +39,10 @@ export function FilterChips({ chips, selected, onSelect }: FilterChipsProps) {
 }
 
 const styles = StyleSheet.create({
-  container: { gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+  container: { gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   chip: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingVertical: 6,
     borderRadius: radius.full,
     borderWidth: 1,
     borderColor: colors.border,
@@ -52,6 +52,6 @@ const styles = StyleSheet.create({
     borderColor: colors.gold,
     backgroundColor: colors.goldDim + "44",
   },
-  text: { ...typography.label, fontSize: 11, color: colors.textSecondary },
-  activeText: { color: colors.gold },
+  text: { fontSize: 13, fontWeight: "500" as const, color: colors.textSecondary },
+  activeText: { color: colors.gold, fontWeight: "600" as const },
 });
