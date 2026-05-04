@@ -16,7 +16,7 @@ import { colors, spacing, radius, typography } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginScreen() {
-  const { login, loginWithBiometrics, biometricAvailable, biometricEnabled } = useAuth();
+  const { login, loginWithBiometrics, biometricAvailable, biometricEnabled, biometricEmail } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -137,7 +137,8 @@ export default function LoginScreen() {
             )}
           </Pressable>
 
-          {biometricAvailable && biometricEnabled && (
+          {biometricAvailable && biometricEnabled &&
+            biometricEmail && email.trim().toLowerCase() === biometricEmail && (
             <Pressable
               style={[styles.bioBtn, bioLoading && styles.btnDisabled]}
               onPress={handleBiometric}

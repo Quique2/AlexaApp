@@ -127,6 +127,22 @@ router.get("/me", requireAuth, async (req: Request, res: Response) => {
   res.json(user);
 });
 
+// ── Biometric token ───────────────────────────────────────────────────────────
+// Creates a dedicated long-lived session for biometric re-auth.
+// Separate from the regular session so regular logout doesn't invalidate it.
+router.post("/biometric-token", requireAuth, async (req: Request, res: Response) => {
+  const { userId } = req as AuthRequest;
+  const refreshToken = signRefresh(userId);
+  await prisma.userSession.create({
+    data: {
+      userId,
+      refreshToken,
+      expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
+    },
+  });
+  res.json({ refreshToken });
+});
+
 // ── Logout ────────────────────────────────────────────────────────────────────
 router.post("/logout", async (req: Request, res: Response) => {
   const { refreshToken } = req.body;

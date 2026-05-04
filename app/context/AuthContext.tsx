@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { Platform } from "react-native";
@@ -12,6 +13,7 @@ import { authApi, AuthUser, setApiToken } from "../services/api";
 
 const REFRESH_KEY = "rrey_refresh_token";
 const BIO_KEY = "rrey_biometric_token";
+const BIO_EMAIL_KEY = "rrey_biometric_email";
 
 // SecureStore falls back to localStorage on web
 const store = {
@@ -36,6 +38,7 @@ export interface AuthState {
   isLoading: boolean;
   biometricAvailable: boolean;
   biometricEnabled: boolean;
+  biometricEmail: string | null; // email of the account that enrolled Face ID
 }
 
 export interface AuthContextType extends AuthState {
@@ -57,13 +60,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading: true,
     biometricAvailable: false,
     biometricEnabled: false,
+    biometricEmail: null,
   });
 
-  // Bootstrap: restore session from stored refresh token
+  // Ref to always access current user without stale closure
+  const userRef = useRef<AuthUser | null>(null);
+  useEffect(() => { userRef.current = state.user; }, [state.user]);
+
+  // Bootstrap: restore session + biometric state from SecureStore
   useEffect(() => {
     async function bootstrap() {
       let biometricAvailable = false;
       let biometricEnabled = false;
+      let biometricEmail: string | null = null;
 
       if (Platform.OS !== "web") {
         const hasHardware = await LocalAuthentication.hasHardwareAsync();
@@ -71,7 +80,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         biometricAvailable = hasHardware && enrolled;
         if (biometricAvailable) {
           const bioToken = await store.get(BIO_KEY);
-          biometricEnabled = !!bioToken;
+          biometricEmail = await store.get(BIO_EMAIL_KEY);
+          biometricEnabled = !!bioToken && !!biometricEmail;
         }
       }
 
@@ -81,29 +91,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const { accessToken } = await authApi.refresh(refreshToken);
           setApiToken(accessToken);
           const user = await authApi.me();
-          setState({ user, accessToken, isLoading: false, biometricAvailable, biometricEnabled });
+          setState({
+            user, accessToken, isLoading: false,
+            biometricAvailable, biometricEnabled, biometricEmail,
+          });
           return;
         } catch {
-          // Refresh token invalid/expired — clear it
           await store.del(REFRESH_KEY).catch(() => {});
         }
       }
 
-      setState((s) => ({ ...s, isLoading: false, biometricAvailable, biometricEnabled }));
+      setState((s) => ({ ...s, isLoading: false, biometricAvailable, biometricEnabled, biometricEmail }));
     }
     bootstrap();
   }, []);
 
-  // Persist tokens and update state after login/register
   const applySession = useCallback(
     async (data: { accessToken: string; refreshToken: string; user: AuthUser }) => {
       await store.set(REFRESH_KEY, data.refreshToken);
       setApiToken(data.accessToken);
-      setState((s) => ({
-        ...s,
-        user: data.user,
-        accessToken: data.accessToken,
-      }));
+      setState((s) => ({ ...s, user: data.user, accessToken: data.accessToken }));
     },
     []
   );
@@ -130,12 +137,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (refreshToken) await authApi.logout(refreshToken);
     } catch {}
     await store.del(REFRESH_KEY).catch(() => {});
-    // Keep BIO_KEY so Face ID remains available on the next login screen
+    // Keep BIO_KEY and BIO_EMAIL_KEY so Face ID remains available on next login
     setApiToken(null);
     setState((s) => ({ ...s, user: null, accessToken: null }));
   }, []);
 
-  // Prompt biometric, then store current refresh token under bio key
+  // Prompts biometric, then creates a DEDICATED server session for biometric use
+  // (separate from the regular session so logout doesn't invalidate it)
   const enableBiometrics = useCallback(async () => {
     const result = await LocalAuthentication.authenticateAsync({
       promptMessage: "Confirma tu identidad para activar Face ID",
@@ -144,19 +152,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     if (!result.success) throw new Error("Autenticación biométrica cancelada");
 
-    const refreshToken = await store.get(REFRESH_KEY);
-    if (!refreshToken) throw new Error("No hay sesión activa");
+    const user = userRef.current;
+    if (!user) throw new Error("No hay sesión activa");
 
-    await store.set(BIO_KEY, refreshToken);
-    setState((s) => ({ ...s, biometricEnabled: true }));
+    // Create a dedicated refresh token that lives independently of the regular session
+    const { refreshToken: bioToken } = await authApi.createBiometricToken();
+    await store.set(BIO_KEY, bioToken);
+    await store.set(BIO_EMAIL_KEY, user.email);
+    setState((s) => ({ ...s, biometricEnabled: true, biometricEmail: user.email }));
   }, []);
 
   const disableBiometrics = useCallback(async () => {
     await store.del(BIO_KEY).catch(() => {});
-    setState((s) => ({ ...s, biometricEnabled: false }));
+    await store.del(BIO_EMAIL_KEY).catch(() => {});
+    setState((s) => ({ ...s, biometricEnabled: false, biometricEmail: null }));
   }, []);
 
-  // Biometric prompt → read stored refresh token → refresh access token
+  // Biometric prompt → use dedicated token → get fresh access token
   const loginWithBiometrics = useCallback(async () => {
     const result = await LocalAuthentication.authenticateAsync({
       promptMessage: "Inicia sesión con Face ID",
@@ -170,6 +182,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { accessToken } = await authApi.refresh(bioToken);
     setApiToken(accessToken);
     const user = await authApi.me();
+    // Store bio token as the active session too
     await store.set(REFRESH_KEY, bioToken);
     setState((s) => ({ ...s, user, accessToken }));
   }, []);

@@ -64,6 +64,8 @@ export const authApi = {
       method: "POST",
       body: JSON.stringify({ refreshToken }),
     }),
+  createBiometricToken: () =>
+    request<{ refreshToken: string }>("/auth/biometric-token", { method: "POST" }),
 };
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
