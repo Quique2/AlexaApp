@@ -11,12 +11,10 @@ import {
   Supplier,
 } from "../types";
 
-// Priority: app.json extra > .env > Expo dev host (auto-detects PC IP on device) > localhost
-const devHost = Constants.expoConfig?.hostUri?.split(":")[0]; // e.g. "10.22.200.185"
 const BASE_URL =
   (Constants.expoConfig?.extra?.apiUrl as string | undefined) ||
   process.env.EXPO_PUBLIC_API_URL ||
-  (devHost ? `http://${devHost}:3000/api` : "http://localhost:3000/api");
+  "https://alexaapp-production.up.railway.app/api";
 
 async function request<T>(
   path: string,
