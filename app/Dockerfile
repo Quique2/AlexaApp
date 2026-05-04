@@ -1,13 +1,9 @@
-FROM node:20-alpine AS builder
+FROM node:20-alpine
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
 RUN npx expo export -p web
-
-FROM nginx:alpine
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/templates/default.conf.template
-ENV PORT=8080
+RUN npm install -g serve
 EXPOSE 8080
-CMD ["nginx", "-g", "daemon off;"]
+CMD sh -c "serve -s dist -l ${PORT:-8080}"
