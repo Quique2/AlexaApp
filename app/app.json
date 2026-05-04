@@ -30,6 +30,9 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": ["expo-router", "expo-font"],
+    "extra": {
+      "apiUrl": "https://alexaapp-production.up.railway.app/api"
+    },
     "experiments": {
       "typedRoutes": true
     }
