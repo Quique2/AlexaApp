@@ -130,9 +130,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (refreshToken) await authApi.logout(refreshToken);
     } catch {}
     await store.del(REFRESH_KEY).catch(() => {});
-    await store.del(BIO_KEY).catch(() => {});
+    // Keep BIO_KEY so Face ID remains available on the next login screen
     setApiToken(null);
-    setState((s) => ({ ...s, user: null, accessToken: null, biometricEnabled: false }));
+    setState((s) => ({ ...s, user: null, accessToken: null }));
   }, []);
 
   // Prompt biometric, then store current refresh token under bio key

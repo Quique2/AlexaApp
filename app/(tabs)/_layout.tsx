@@ -1,5 +1,5 @@
 import { Alert, Pressable } from "react-native";
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
@@ -19,6 +19,7 @@ function TabIcon({ name, focused }: { name: IoniconName; focused: boolean }) {
 function HeaderRight() {
   const { logout, biometricAvailable, biometricEnabled, enableBiometrics, disableBiometrics } =
     useAuth();
+  const router = useRouter();
 
   function handleMenu() {
     const bioAction = biometricAvailable
@@ -44,7 +45,14 @@ function HeaderRight() {
         onPress: () =>
           Alert.alert("Cerrar sesión", "¿Seguro que quieres salir?", [
             { text: "Cancelar", style: "cancel" },
-            { text: "Salir", style: "destructive", onPress: logout },
+            {
+              text: "Salir",
+              style: "destructive",
+              onPress: async () => {
+                await logout();
+                router.replace("/(auth)/login");
+              },
+            },
           ]),
       },
       { text: "Cancelar", style: "cancel" },
