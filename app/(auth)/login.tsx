@@ -10,13 +10,14 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing, radius, typography } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginScreen() {
   const { login, loginWithBiometrics, biometricAvailable, biometricEnabled } = useAuth();
+  const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,6 +35,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login(email.trim().toLowerCase(), password);
+      router.replace("/(tabs)");
     } catch (e: any) {
       setError(e.message ?? "Error al iniciar sesión");
     } finally {
@@ -46,6 +48,7 @@ export default function LoginScreen() {
     setBioLoading(true);
     try {
       await loginWithBiometrics();
+      router.replace("/(tabs)");
     } catch (e: any) {
       setError(e.message ?? "Error en autenticación biométrica");
     } finally {

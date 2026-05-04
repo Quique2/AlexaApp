@@ -10,13 +10,14 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, spacing, radius, typography } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
 
 export default function RegisterScreen() {
   const { register } = useAuth();
+  const router = useRouter();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -43,6 +44,7 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register(email.trim().toLowerCase(), password, name.trim() || undefined);
+      router.replace("/(tabs)");
     } catch (e: any) {
       setError(e.message ?? "Error al crear la cuenta");
     } finally {
