@@ -16,21 +16,55 @@ const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ||
   "https://alexaapp-production.up.railway.app/api";
 
+// Token injected by AuthContext after login; lives only in memory
+let _accessToken: string | null = null;
+export const setApiToken = (token: string | null) => { _accessToken = token; };
+
 async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${BASE_URL}${path}`;
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json", ...options.headers },
-    ...options,
-  });
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+  };
+  if (_accessToken) headers["Authorization"] = `Bearer ${_accessToken}`;
+  const res = await fetch(url, { ...options, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error((err as any).error ?? "Request failed");
   }
   return res.json();
 }
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+export type AuthUser = { id: string; email: string; name?: string | null };
+export type AuthResponse = { accessToken: string; refreshToken: string; user: AuthUser };
+
+export const authApi = {
+  register: (email: string, password: string, name?: string) =>
+    request<AuthResponse>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ email, password, name }),
+    }),
+  login: (email: string, password: string) =>
+    request<AuthResponse>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+  refresh: (refreshToken: string) =>
+    request<{ accessToken: string }>("/auth/refresh", {
+      method: "POST",
+      body: JSON.stringify({ refreshToken }),
+    }),
+  me: () => request<AuthUser>("/auth/me"),
+  logout: (refreshToken: string) =>
+    request<{ ok: boolean }>("/auth/logout", {
+      method: "POST",
+      body: JSON.stringify({ refreshToken }),
+    }),
+};
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 export const dashboardApi = {
