@@ -39,7 +39,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login(email.trim().toLowerCase(), password);
-      router.replace("/(tabs)");
+      router.replace("/dashboard");
     } catch (e: any) {
       setError(e.message ?? "Error al iniciar sesión");
     } finally {
@@ -52,7 +52,7 @@ export default function LoginScreen() {
     setBioLoading(true);
     try {
       await loginWithBiometrics();
-      router.replace("/(tabs)");
+      router.replace("/dashboard");
     } catch (e: any) {
       setError(e.message ?? "Error en autenticación biométrica");
     } finally {
@@ -155,7 +155,7 @@ export default function LoginScreen() {
 
           <View style={styles.footer}>
             <Text style={typography.bodySmall}>¿No tienes cuenta? </Text>
-            <Link href="/(auth)/register" asChild>
+            <Link href="/register" asChild>
               <Pressable>
                 <Text style={[typography.bodySmall, { color: colors.gold, fontWeight: "600" }]}>Regístrate</Text>
               </Pressable>

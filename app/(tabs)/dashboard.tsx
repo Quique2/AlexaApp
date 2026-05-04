@@ -94,7 +94,7 @@ export default function DashboardScreen() {
               ? { backgroundColor: colors.redBg, borderColor: colors.red }
               : { backgroundColor: colors.yellowBg, borderColor: colors.yellow },
           ]}
-          onPress={() => router.push("/(tabs)/inventory")}
+          onPress={() => router.push("/inventory")}
         >
           <Text
             style={[
@@ -112,23 +112,23 @@ export default function DashboardScreen() {
         </Pressable>
       )}
 
-      <SectionHeader title="ALERTAS JIT (HOY)" action="Ver inventario" onAction={() => router.push("/(tabs)/inventory")} />
+      <SectionHeader title="ALERTAS JIT (HOY)" action="Ver inventario" onAction={() => router.push("/inventory")} />
       <View style={styles.kpiRow}>
-        <KPICard label="🔴 PEDIR YA" value={s.alerts.red} sub="materiales críticos" accent="red" onPress={() => router.push("/(tabs)/inventory")} />
-        <KPICard label="🟡 PEDIR PRONTO" value={s.alerts.yellow} sub="materiales con alerta" accent="yellow" onPress={() => router.push("/(tabs)/inventory")} />
+        <KPICard label="🔴 PEDIR YA" value={s.alerts.red} sub="materiales críticos" accent="red" onPress={() => router.push("/inventory")} />
+        <KPICard label="🟡 PEDIR PRONTO" value={s.alerts.yellow} sub="materiales con alerta" accent="yellow" onPress={() => router.push("/inventory")} />
         <KPICard label="🟢 OK" value={s.alerts.green} sub="materiales en stock" accent="green" />
       </View>
 
       <SectionHeader title="PRODUCCIÓN & GASTO" />
       <View style={styles.kpiRow}>
-        <KPICard label="LOTES · 7 DÍAS" value={s.upcoming.batches} sub={`${s.upcoming.plans.length} estilos planificados`} accent="gold" onPress={() => router.push("/(tabs)/production")} />
+        <KPICard label="LOTES · 7 DÍAS" value={s.upcoming.batches} sub={`${s.upcoming.plans.length} estilos planificados`} accent="gold" onPress={() => router.push("/production")} />
         <KPICard label="KG MALTA · 7 DÍAS" value={s.upcoming.maltKg.toFixed(0)} sub="kg necesarios" accent="cream" />
-        <KPICard label="GASTO ESTE MES" value={MXN(s.monthlySpend.total)} sub={`${s.monthlySpend.orderCount} pedidos`} accent="gold" onPress={() => router.push("/(tabs)/orders")} />
+        <KPICard label="GASTO ESTE MES" value={MXN(s.monthlySpend.total)} sub={`${s.monthlySpend.orderCount} pedidos`} accent="gold" onPress={() => router.push("/orders")} />
       </View>
 
       {redItems.length > 0 && (
         <>
-          <SectionHeader title="PEDIR HOY" action="Ver todos" onAction={() => router.push("/(tabs)/inventory")} />
+          <SectionHeader title="PEDIR HOY" action="Ver todos" onAction={() => router.push("/inventory")} />
           <View style={[styles.alertList, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {redItems.slice(0, 6).map((item) => (
               <AlertItem key={item.id} item={item} />
@@ -139,7 +139,7 @@ export default function DashboardScreen() {
 
       {s.upcoming.plans.length > 0 && (
         <>
-          <SectionHeader title="PRÓXIMA PRODUCCIÓN" action="Ver plan" onAction={() => router.push("/(tabs)/production")} />
+          <SectionHeader title="PRÓXIMA PRODUCCIÓN" action="Ver plan" onAction={() => router.push("/production")} />
           <View style={[styles.prodList, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {s.upcoming.plans.slice(0, 4).map((plan) => (
               <ProdCard key={plan.id} plan={plan} colors={colors} typography={typography} borderColor={colors.border} />

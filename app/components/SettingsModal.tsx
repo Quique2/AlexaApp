@@ -45,7 +45,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
         style: "destructive",
         onPress: async () => {
           await logout();
-          router.replace("/(auth)/login");
+          router.replace("/login");
         },
       },
     ]);

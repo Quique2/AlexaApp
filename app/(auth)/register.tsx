@@ -48,7 +48,7 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register(email.trim().toLowerCase(), password, name.trim() || undefined);
-      router.replace("/(tabs)");
+      router.replace("/dashboard");
     } catch (e: any) {
       setError(e.message ?? "Error al crear la cuenta");
     } finally {
@@ -163,7 +163,7 @@ export default function RegisterScreen() {
 
           <View style={styles.footer}>
             <Text style={typography.bodySmall}>¿Ya tienes cuenta? </Text>
-            <Link href="/(auth)/login" asChild>
+            <Link href="/login" asChild>
               <Pressable>
                 <Text style={[typography.bodySmall, { color: colors.gold, fontWeight: "600" }]}>Inicia sesión</Text>
               </Pressable>
