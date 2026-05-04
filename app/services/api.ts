@@ -66,6 +66,10 @@ export const authApi = {
     }),
   createBiometricToken: () =>
     request<{ refreshToken: string }>("/auth/biometric-token", { method: "POST" }),
+  // Creates a fresh regular session (used after biometric login to get a REFRESH_KEY
+  // that is independent of the dedicated BIO_KEY, so logout doesn't kill biometrics)
+  createSession: () =>
+    request<{ refreshToken: string }>("/auth/biometric-token", { method: "POST" }),
 };
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────

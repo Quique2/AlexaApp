@@ -168,7 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState((s) => ({ ...s, biometricEnabled: false, biometricEmail: null }));
   }, []);
 
-  // Biometric prompt → use dedicated token → get fresh access token
+  // Biometric prompt → use dedicated bio token → create a SEPARATE regular session
   const loginWithBiometrics = useCallback(async () => {
     const result = await LocalAuthentication.authenticateAsync({
       promptMessage: "Inicia sesión con Face ID",
@@ -179,11 +179,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const bioToken = await store.get(BIO_KEY);
     if (!bioToken) throw new Error("No hay sesión biométrica guardada");
 
+    // Step 1: use the bio token to get an access token
     const { accessToken } = await authApi.refresh(bioToken);
     setApiToken(accessToken);
     const user = await authApi.me();
-    // Store bio token as the active session too
-    await store.set(REFRESH_KEY, bioToken);
+
+    // Step 2: create a FRESH regular session for REFRESH_KEY
+    // This keeps BIO_KEY independent — logout deletes the regular session only
+    const { refreshToken: sessionToken } = await authApi.createSession();
+    await store.set(REFRESH_KEY, sessionToken);
+
     setState((s) => ({ ...s, user, accessToken }));
   }, []);
 
