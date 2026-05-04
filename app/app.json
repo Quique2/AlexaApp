@@ -35,6 +35,7 @@
       "expo-secure-store"
     ],
     "extra": {
+      "router": { "root": "." },
       "apiUrl": "https://alexaapp-production.up.railway.app/api"
     },
     "experiments": {
