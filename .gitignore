@@ -48,7 +48,6 @@ dist/
 # Expo
 .expo/
 app/.expo/
-app/dist/
 app/.env
 
 # Prisma
