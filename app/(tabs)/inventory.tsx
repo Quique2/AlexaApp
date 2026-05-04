@@ -14,7 +14,8 @@ import {
   RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, spacing, radius, typography, shadows } from "../constants/theme";
+import { spacing, radius, Colors } from "../constants/theme";
+import { useTheme } from "../context/ThemeContext";
 import { SearchBar } from "../components/SearchBar";
 import { FilterChips } from "../components/FilterChips";
 import { InventoryRow } from "../components/InventoryRow";
@@ -40,16 +41,16 @@ const TYPE_FILTERS = [
 ];
 
 export default function InventoryScreen() {
+  const { colors, typography } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [search, setSearch] = useState("");
   const [alertFilter, setAlertFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [selected, setSelected] = useState<IRow | null>(null);
 
   const params = useMemo(
-    () => ({
-      alert: alertFilter || undefined,
-      type: typeFilter || undefined,
-    }),
+    () => ({ alert: alertFilter || undefined, type: typeFilter || undefined }),
     [alertFilter, typeFilter]
   );
 
@@ -67,29 +68,23 @@ export default function InventoryScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.loading}>
+      <View style={[styles.loading, { backgroundColor: colors.bg }]}>
         <ActivityIndicator color={colors.gold} size="large" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Search */}
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.searchRow}>
         <SearchBar value={search} onChangeText={setSearch} placeholder="Buscar material..." />
       </View>
 
-      {/* Alert filter */}
       <FilterChips chips={ALERT_FILTERS} selected={alertFilter} onSelect={setAlertFilter} />
-
-      {/* Type filter */}
       <FilterChips chips={TYPE_FILTERS} selected={typeFilter} onSelect={setTypeFilter} />
 
-      {/* Count */}
-      <Text style={styles.count}>{filtered.length} materiales</Text>
+      <Text style={[typography.caption, styles.count]}>{filtered.length} materiales</Text>
 
-      {/* List */}
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
@@ -99,15 +94,10 @@ export default function InventoryScreen() {
           <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.gold} />
         }
         ListEmptyComponent={
-          <EmptyState
-            icon="🔍"
-            title="Sin resultados"
-            subtitle="Intenta con otro filtro o búsqueda"
-          />
+          <EmptyState icon="🔍" title="Sin resultados" subtitle="Intenta con otro filtro o búsqueda" />
         }
       />
 
-      {/* Edit modal */}
       {selected && (
         <EditModal
           item={selected}
@@ -125,7 +115,6 @@ export default function InventoryScreen() {
   );
 }
 
-// ─── Edit Modal ──────────────────────────────────────────────────────────────
 interface EditModalProps {
   item: IRow;
   onClose: () => void;
@@ -134,6 +123,9 @@ interface EditModalProps {
 }
 
 function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
+  const { colors, typography } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const mat = item.material!;
   const [stock, setStock] = useState(String(item.currentStock));
   const [consumption, setConsumption] = useState(String(item.dailyConsumption));
@@ -151,14 +143,14 @@ function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
         style={styles.overlay}
       >
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={styles.sheet}>
-          {/* Handle */}
-          <View style={styles.handle} />
+        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
-          {/* Header */}
           <View style={styles.sheetHeader}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.sheetTitle} numberOfLines={2}>{mat.name}</Text>
+              <Text style={[typography.h3, { marginBottom: spacing.xs }]} numberOfLines={2}>
+                {mat.name}
+              </Text>
               <AlertBadge status={item.alertStatus} />
             </View>
             <Pressable onPress={onClose} hitSlop={8}>
@@ -167,45 +159,29 @@ function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
           </View>
 
           <ScrollView>
-            {/* Coverage preview */}
             {coverage !== null && (
-              <View style={styles.coveragePill}>
-                <Text style={styles.coverageText}>
-                  Cobertura actual: <Text style={{ color: colors.gold }}>{coverage} días</Text>
+              <View style={[styles.coveragePill, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={typography.bodySmall}>
+                  Cobertura actual:{" "}
+                  <Text style={{ color: colors.gold }}>{coverage} días</Text>
                 </Text>
               </View>
             )}
 
             <View style={styles.fieldGroup}>
-              <Field
-                label={`Stock actual (${mat.unit})`}
-                value={stock}
-                onChangeText={setStock}
-                keyboardType="decimal-pad"
-              />
-              <Field
-                label={`Consumo diario planado (${mat.unit}/día)`}
-                value={consumption}
-                onChangeText={setConsumption}
-                keyboardType="decimal-pad"
-              />
-              <Field
-                label="Notas / condición"
-                value={notes}
-                onChangeText={setNotes}
-                multiline
-              />
+              <Field label={`Stock actual (${mat.unit})`} value={stock} onChangeText={setStock} keyboardType="decimal-pad" colors={colors} typography={typography} />
+              <Field label={`Consumo diario planado (${mat.unit}/día)`} value={consumption} onChangeText={setConsumption} keyboardType="decimal-pad" colors={colors} typography={typography} />
+              <Field label="Notas / condición" value={notes} onChangeText={setNotes} multiline colors={colors} typography={typography} />
             </View>
 
-            {/* Material info */}
             <View style={styles.infoRow}>
-              <InfoCell label="Precio unit." value={`$${mat.unitPrice}`} />
-              <InfoCell label="Proveedor" value={mat.supplier?.name?.split(" ")[0] ?? "—"} />
-              <InfoCell label="Reorden" value={`${item.reorderPointDays}d`} />
+              <InfoCell label="Precio unit." value={`$${mat.unitPrice}`} colors={colors} typography={typography} />
+              <InfoCell label="Proveedor" value={mat.supplier?.name?.split(" ")[0] ?? "—"} colors={colors} typography={typography} />
+              <InfoCell label="Reorden" value={`${item.reorderPointDays}d`} colors={colors} typography={typography} />
             </View>
 
             <Pressable
-              style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+              style={[styles.saveBtn, { backgroundColor: colors.gold }, saving && styles.saveBtnDisabled]}
               onPress={() =>
                 onSave({
                   currentStock: parseFloat(stock) || 0,
@@ -218,7 +194,7 @@ function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
               {saving ? (
                 <ActivityIndicator color={colors.bg} size="small" />
               ) : (
-                <Text style={styles.saveBtnText}>Guardar</Text>
+                <Text style={[typography.h4, { color: colors.bg }]}>Guardar</Text>
               )}
             </Pressable>
           </ScrollView>
@@ -229,23 +205,33 @@ function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
 }
 
 function Field({
-  label,
-  value,
-  onChangeText,
-  keyboardType,
-  multiline,
+  label, value, onChangeText, keyboardType, multiline, colors, typography,
 }: {
   label: string;
   value: string;
   onChangeText: (v: string) => void;
   keyboardType?: "decimal-pad";
   multiline?: boolean;
+  colors: Colors;
+  typography: any;
 }) {
   return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+    <View style={{ gap: spacing.xs }}>
+      <Text style={typography.label}>{label}</Text>
       <TextInput
-        style={[styles.fieldInput, multiline && styles.fieldInputMulti]}
+        style={[
+          {
+            backgroundColor: colors.card,
+            borderRadius: radius.md,
+            borderWidth: 1,
+            borderColor: colors.border,
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.sm,
+            color: colors.textPrimary,
+            fontSize: 16,
+          },
+          multiline && { minHeight: 72, textAlignVertical: "top" as const, paddingTop: spacing.sm },
+        ]}
         value={value}
         onChangeText={onChangeText}
         keyboardType={keyboardType ?? "default"}
@@ -257,100 +243,74 @@ function Field({
   );
 }
 
-function InfoCell({ label, value }: { label: string; value: string }) {
+function InfoCell({ label, value, colors, typography }: { label: string; value: string; colors: Colors; typography: any }) {
   return (
-    <View style={styles.infoCell}>
-      <Text style={styles.infoCellLabel}>{label}</Text>
-      <Text style={styles.infoCellValue}>{value}</Text>
+    <View style={[infoCellStyles.cell, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <Text style={typography.caption}>{label}</Text>
+      <Text style={[typography.h4, { fontSize: 13 }]}>{value}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  loading: { flex: 1, alignItems: "center", justifyContent: "center" },
-  searchRow: { padding: spacing.md, paddingBottom: spacing.xs },
-  count: { ...typography.caption, paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
-
-  // Modal
-  overlay: { flex: 1, justifyContent: "flex-end" },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)" },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    maxHeight: "85%",
-    paddingBottom: spacing.xl,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-    alignSelf: "center",
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  sheetHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-    gap: spacing.sm,
-  },
-  sheetTitle: { ...typography.h3, marginBottom: spacing.xs },
-
-  coveragePill: {
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
-    backgroundColor: colors.card,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  coverageText: { ...typography.bodySmall },
-
-  fieldGroup: { paddingHorizontal: spacing.md, gap: spacing.sm, marginBottom: spacing.md },
-  field: { gap: spacing.xs },
-  fieldLabel: { ...typography.label },
-  fieldInput: {
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    color: colors.textPrimary,
-    fontSize: 16,
-  },
-  fieldInputMulti: { minHeight: 72, textAlignVertical: "top", paddingTop: spacing.sm },
-
-  infoRow: {
-    flexDirection: "row",
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.md,
-    gap: spacing.sm,
-  },
-  infoCell: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    alignItems: "center",
-    gap: 2,
-  },
-  infoCellLabel: { ...typography.caption },
-  infoCellValue: { ...typography.h4, fontSize: 13 },
-
-  saveBtn: {
-    marginHorizontal: spacing.md,
-    backgroundColor: colors.gold,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    alignItems: "center",
-  },
-  saveBtnDisabled: { opacity: 0.6 },
-  saveBtnText: { ...typography.h4, color: colors.bg },
+const infoCellStyles = StyleSheet.create({
+  cell: { flex: 1, borderRadius: radius.md, padding: spacing.sm, alignItems: "center", gap: 2, borderWidth: 1 },
 });
+
+function makeStyles(colors: Colors) {
+  return StyleSheet.create({
+    container: { flex: 1 },
+    loading: { flex: 1, alignItems: "center", justifyContent: "center" },
+    searchRow: { padding: spacing.md, paddingBottom: spacing.xs },
+    count: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
+
+    overlay: { flex: 1, justifyContent: "flex-end" },
+    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)" },
+    sheet: {
+      borderTopLeftRadius: radius.xl,
+      borderTopRightRadius: radius.xl,
+      maxHeight: "85%",
+      paddingBottom: spacing.xl,
+    },
+    handle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      alignSelf: "center",
+      marginTop: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    sheetHeader: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      paddingHorizontal: spacing.md,
+      paddingBottom: spacing.md,
+      gap: spacing.sm,
+    },
+
+    coveragePill: {
+      marginHorizontal: spacing.md,
+      marginBottom: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radius.md,
+      borderWidth: 1,
+    },
+
+    fieldGroup: { paddingHorizontal: spacing.md, gap: spacing.sm, marginBottom: spacing.md },
+
+    infoRow: {
+      flexDirection: "row",
+      paddingHorizontal: spacing.md,
+      marginBottom: spacing.md,
+      gap: spacing.sm,
+    },
+
+    saveBtn: {
+      marginHorizontal: spacing.md,
+      borderRadius: radius.md,
+      paddingVertical: spacing.md,
+      alignItems: "center",
+    },
+    saveBtnDisabled: { opacity: 0.6 },
+  });
+}

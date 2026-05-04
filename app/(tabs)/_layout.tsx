@@ -1,74 +1,43 @@
-import { Alert, Pressable } from "react-native";
-import { Tabs, useRouter } from "expo-router";
+import React, { useState } from "react";
+import { Pressable } from "react-native";
+import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { colors } from "../constants/theme";
-import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+import { SettingsModal } from "../components/SettingsModal";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
-function TabIcon({ name, focused }: { name: IoniconName; focused: boolean }) {
+function TabIcon({ name, focused, color }: { name: IoniconName; focused: boolean; color: string }) {
   return (
     <Ionicons
       name={focused ? name : (`${name}-outline` as IoniconName)}
       size={22}
-      color={focused ? colors.gold : colors.textMuted}
+      color={color}
     />
   );
 }
 
 function HeaderRight() {
-  const { logout, biometricAvailable, biometricEnabled, enableBiometrics, disableBiometrics } =
-    useAuth();
-  const router = useRouter();
-
-  function handleMenu() {
-    const bioAction = biometricAvailable
-      ? biometricEnabled
-        ? {
-            text: "Desactivar Face ID",
-            onPress: () => disableBiometrics(),
-          }
-        : {
-            text: "Activar Face ID",
-            onPress: () =>
-              enableBiometrics().catch((e) =>
-                Alert.alert("Error", e.message)
-              ),
-          }
-      : null;
-
-    const options: any[] = [
-      ...(bioAction ? [bioAction] : []),
-      {
-        text: "Cerrar sesión",
-        style: "destructive",
-        onPress: () =>
-          Alert.alert("Cerrar sesión", "¿Seguro que quieres salir?", [
-            { text: "Cancelar", style: "cancel" },
-            {
-              text: "Salir",
-              style: "destructive",
-              onPress: async () => {
-                await logout();
-                router.replace("/(auth)/login");
-              },
-            },
-          ]),
-      },
-      { text: "Cancelar", style: "cancel" },
-    ];
-
-    Alert.alert("Cuenta", "", options);
-  }
+  const { colors } = useTheme();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
-    <Pressable onPress={handleMenu} style={{ paddingHorizontal: 16 }} hitSlop={8}>
-      <Ionicons name="person-circle-outline" size={26} color={colors.textSecondary} />
-    </Pressable>
+    <>
+      <Pressable
+        onPress={() => setSettingsOpen(true)}
+        style={{ paddingHorizontal: 16 }}
+        hitSlop={8}
+      >
+        <Ionicons name="person-circle-outline" size={26} color={colors.textSecondary} />
+      </Pressable>
+      <SettingsModal visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
+    </>
   );
 }
 
 export default function TabLayout() {
+  const { colors } = useTheme();
+
   return (
     <Tabs
       screenOptions={{
@@ -91,7 +60,9 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Dashboard",
-          tabBarIcon: ({ focused }) => <TabIcon name="grid" focused={focused} />,
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name="grid" focused={focused} color={color} />
+          ),
           headerTitle: "Rrëy",
           headerTitleStyle: {
             fontSize: 24,
@@ -105,21 +76,27 @@ export default function TabLayout() {
         name="inventory"
         options={{
           title: "Inventario",
-          tabBarIcon: ({ focused }) => <TabIcon name="cube" focused={focused} />,
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name="cube" focused={focused} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="production"
         options={{
           title: "Producción",
-          tabBarIcon: ({ focused }) => <TabIcon name="flask" focused={focused} />,
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name="flask" focused={focused} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="orders"
         options={{
           title: "Pedidos",
-          tabBarIcon: ({ focused }) => <TabIcon name="receipt" focused={focused} />,
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name="receipt" focused={focused} color={color} />
+          ),
         }}
       />
     </Tabs>

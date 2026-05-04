@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -12,11 +12,13 @@ import {
 } from "react-native";
 import { Link, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, spacing, radius, typography } from "../constants/theme";
+import { spacing, radius, Colors } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 
 export default function RegisterScreen() {
   const { register } = useAuth();
+  const { colors, typography } = useTheme();
   const router = useRouter();
 
   const [name, setName] = useState("");
@@ -26,6 +28,8 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   async function handleRegister() {
     if (!email.trim() || !password) {
@@ -54,35 +58,33 @@ export default function RegisterScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.flex}
+      style={[styles.flex, { backgroundColor: colors.bg }]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Logo */}
         <View style={styles.header}>
           <Text style={styles.logo}>🍺</Text>
-          <Text style={styles.brand}>Rrëy</Text>
-          <Text style={styles.subtitle}>Cervecería · Sistema de gestión</Text>
+          <Text style={[styles.brand, { color: colors.gold }]}>Rrëy</Text>
+          <Text style={[typography.bodySmall, { marginTop: 4 }]}>Cervecería · Sistema de gestión</Text>
         </View>
 
-        {/* Card */}
-        <View style={styles.card}>
-          <Text style={styles.title}>Crear cuenta</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[typography.h2, { marginBottom: spacing.lg }]}>Crear cuenta</Text>
 
           {error && (
-            <View style={styles.errorBox}>
+            <View style={[styles.errorBox, { backgroundColor: colors.redBg, borderColor: colors.red + "44" }]}>
               <Ionicons name="alert-circle" size={16} color={colors.red} />
-              <Text style={styles.errorText}>{error}</Text>
+              <Text style={[typography.bodySmall, { color: colors.red, flex: 1 }]}>{error}</Text>
             </View>
           )}
 
           <View style={styles.field}>
-            <Text style={styles.label}>Nombre (opcional)</Text>
+            <Text style={typography.label}>Nombre (opcional)</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]}
               value={name}
               onChangeText={setName}
               placeholder="Tu nombre"
@@ -93,9 +95,9 @@ export default function RegisterScreen() {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={typography.label}>Email</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]}
               value={email}
               onChangeText={setEmail}
               placeholder="tu@email.com"
@@ -108,10 +110,10 @@ export default function RegisterScreen() {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Contraseña</Text>
+            <Text style={typography.label}>Contraseña</Text>
             <View style={styles.inputRow}>
               <TextInput
-                style={[styles.input, styles.inputFlex]}
+                style={[styles.input, styles.inputFlex, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]}
                 value={password}
                 onChangeText={setPassword}
                 placeholder="Mínimo 8 caracteres"
@@ -119,11 +121,7 @@ export default function RegisterScreen() {
                 secureTextEntry={!showPassword}
                 returnKeyType="next"
               />
-              <Pressable
-                onPress={() => setShowPassword((v) => !v)}
-                style={styles.eyeBtn}
-                hitSlop={8}
-              >
+              <Pressable onPress={() => setShowPassword((v) => !v)} style={styles.eyeBtn} hitSlop={8}>
                 <Ionicons
                   name={showPassword ? "eye-off" : "eye"}
                   size={20}
@@ -134,11 +132,12 @@ export default function RegisterScreen() {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Confirmar contraseña</Text>
+            <Text style={typography.label}>Confirmar contraseña</Text>
             <TextInput
               style={[
                 styles.input,
-                confirm.length > 0 && confirm !== password && styles.inputError,
+                { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary },
+                confirm.length > 0 && confirm !== password && { borderColor: colors.red },
               ]}
               value={confirm}
               onChangeText={setConfirm}
@@ -151,22 +150,22 @@ export default function RegisterScreen() {
           </View>
 
           <Pressable
-            style={[styles.btn, loading && styles.btnDisabled]}
+            style={[styles.btn, { backgroundColor: colors.gold }, loading && styles.btnDisabled]}
             onPress={handleRegister}
             disabled={loading}
           >
             {loading ? (
               <ActivityIndicator color={colors.bg} size="small" />
             ) : (
-              <Text style={styles.btnText}>Crear cuenta</Text>
+              <Text style={[styles.btnText, { color: colors.bg }]}>Crear cuenta</Text>
             )}
           </Pressable>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>¿Ya tienes cuenta? </Text>
+            <Text style={typography.bodySmall}>¿Ya tienes cuenta? </Text>
             <Link href="/(auth)/login" asChild>
               <Pressable>
-                <Text style={styles.link}>Inicia sesión</Text>
+                <Text style={[typography.bodySmall, { color: colors.gold, fontWeight: "600" }]}>Inicia sesión</Text>
               </Pressable>
             </Link>
           </View>
@@ -176,83 +175,56 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.bg },
-  container: {
-    flexGrow: 1,
-    justifyContent: "center",
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
-  },
-  header: { alignItems: "center", marginBottom: spacing.xl },
-  logo: { fontSize: 52 },
-  brand: {
-    fontSize: 36,
-    fontWeight: "800",
-    color: colors.gold,
-    letterSpacing: -1,
-    marginTop: spacing.xs,
-  },
-  subtitle: { ...typography.bodySmall, marginTop: 4 },
+function makeStyles(colors: Colors) {
+  return StyleSheet.create({
+    flex: { flex: 1 },
+    container: {
+      flexGrow: 1,
+      justifyContent: "center",
+      padding: spacing.lg,
+      paddingBottom: spacing.xxl,
+    },
+    header: { alignItems: "center", marginBottom: spacing.xl },
+    logo: { fontSize: 52 },
+    brand: { fontSize: 36, fontWeight: "800", letterSpacing: -1, marginTop: spacing.xs },
 
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  title: { ...typography.h2, marginBottom: spacing.lg },
+    card: {
+      borderRadius: radius.xl,
+      padding: spacing.lg,
+      borderWidth: 1,
+    },
 
-  errorBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    backgroundColor: colors.redBg,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.red + "44",
-  },
-  errorText: { ...typography.bodySmall, color: colors.red, flex: 1 },
+    errorBox: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.xs,
+      borderRadius: radius.md,
+      padding: spacing.sm,
+      marginBottom: spacing.md,
+      borderWidth: 1,
+    },
 
-  field: { marginBottom: spacing.md },
-  label: { ...typography.label, marginBottom: spacing.xs },
-  input: {
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 14,
-    color: colors.textPrimary,
-    fontSize: 16,
-  },
-  inputError: { borderColor: colors.red },
-  inputRow: { flexDirection: "row", alignItems: "center" },
-  inputFlex: { flex: 1 },
-  eyeBtn: {
-    position: "absolute",
-    right: spacing.md,
-    padding: 4,
-  },
+    field: { marginBottom: spacing.md },
+    input: {
+      borderRadius: radius.md,
+      borderWidth: 1,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 14,
+      fontSize: 16,
+    },
+    inputRow: { flexDirection: "row", alignItems: "center" },
+    inputFlex: { flex: 1 },
+    eyeBtn: { position: "absolute", right: spacing.md, padding: 4 },
 
-  btn: {
-    backgroundColor: colors.gold,
-    borderRadius: radius.md,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginTop: spacing.xs,
-  },
-  btnDisabled: { opacity: 0.6 },
-  btnText: { fontSize: 16, fontWeight: "700", color: colors.bg },
+    btn: {
+      borderRadius: radius.md,
+      paddingVertical: 16,
+      alignItems: "center",
+      marginTop: spacing.xs,
+    },
+    btnDisabled: { opacity: 0.6 },
+    btnText: { fontSize: 16, fontWeight: "700" },
 
-  footer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: spacing.lg,
-  },
-  footerText: { ...typography.bodySmall },
-  link: { ...typography.bodySmall, color: colors.gold, fontWeight: "600" },
-});
+    footer: { flexDirection: "row", justifyContent: "center", marginTop: spacing.lg },
+  });
+}

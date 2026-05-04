@@ -1,7 +1,8 @@
-import React from "react";
-import { View, TextInput, StyleSheet, Pressable, Text } from "react-native";
+import React, { useMemo } from "react";
+import { View, TextInput, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, spacing, radius, typography } from "../constants/theme";
+import { spacing, radius, Colors } from "../constants/theme";
+import { useTheme } from "../context/ThemeContext";
 
 interface SearchBarProps {
   value: string;
@@ -10,11 +11,14 @@ interface SearchBarProps {
 }
 
 export function SearchBar({ value, onChangeText, placeholder = "Buscar..." }: SearchBarProps) {
+  const { colors, typography } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <View style={styles.container}>
       <Ionicons name="search" size={16} color={colors.textMuted} style={styles.icon} />
       <TextInput
-        style={styles.input}
+        style={[typography.body, styles.input]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
@@ -32,23 +36,24 @@ export function SearchBar({ value, onChangeText, placeholder = "Buscar..." }: Se
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs + 2,
-    gap: spacing.xs,
-  },
-  icon: { marginLeft: 2 },
-  input: {
-    flex: 1,
-    ...typography.body,
-    color: colors.textPrimary,
-    padding: 0,
-  },
-});
+function makeStyles(colors: Colors) {
+  return StyleSheet.create({
+    container: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.surface,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xs + 2,
+      gap: spacing.xs,
+    },
+    icon: { marginLeft: 2 },
+    input: {
+      flex: 1,
+      color: colors.textPrimary,
+      padding: 0,
+    },
+  });
+}

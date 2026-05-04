@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { colors, spacing, typography } from "../constants/theme";
+import { spacing } from "../constants/theme";
+import { useTheme } from "../context/ThemeContext";
 
 interface EmptyStateProps {
   icon?: string;
@@ -9,11 +10,18 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ icon = "📦", title, subtitle }: EmptyStateProps) {
+  const { colors, typography } = useTheme();
   return (
     <View style={styles.container}>
       <Text style={styles.icon}>{icon}</Text>
-      <Text style={styles.title}>{title}</Text>
-      {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+      <Text style={[typography.h4, { color: colors.textSecondary, textAlign: "center" }]}>
+        {title}
+      </Text>
+      {subtitle && (
+        <Text style={[typography.bodySmall, { textAlign: "center", maxWidth: 260 }]}>
+          {subtitle}
+        </Text>
+      )}
     </View>
   );
 }
@@ -26,6 +34,4 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   icon: { fontSize: 40 },
-  title: { ...typography.h4, color: colors.textSecondary, textAlign: "center" },
-  subtitle: { ...typography.bodySmall, textAlign: "center", maxWidth: 260 },
 });

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   FlatList,
@@ -15,7 +15,8 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, spacing, radius, typography } from "../constants/theme";
+import { spacing, radius, Colors } from "../constants/theme";
+import { useTheme } from "../context/ThemeContext";
 import { EmptyState } from "../components/EmptyState";
 import { useOrders, useUpdateOrder } from "../hooks/useOrders";
 import { receptionsApi, ordersApi } from "../services/api";
@@ -30,14 +31,6 @@ const STATUS_FILTERS: { label: string; value: string }[] = [
   { label: "Cancelados", value: "CANCELLED" },
 ];
 
-const STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; bg: string; icon: string }> = {
-  PENDING:           { label: "Pendiente",       color: colors.yellow, bg: colors.yellowBg,          icon: "time-outline" },
-  IN_TRANSIT:        { label: "En tránsito",      color: colors.gold,   bg: colors.goldDim + "44",   icon: "airplane-outline" },
-  RECEIVED_COMPLETE: { label: "Recibido",         color: colors.green,  bg: colors.greenBg,          icon: "checkmark-circle-outline" },
-  RECEIVED_PARTIAL:  { label: "Parc. recibido",   color: colors.yellow, bg: colors.yellowBg,         icon: "alert-circle-outline" },
-  CANCELLED:         { label: "Cancelado",        color: colors.none,   bg: colors.noneBg,           icon: "close-circle-outline" },
-};
-
 const MXN = (n: number) =>
   n.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
 
@@ -51,7 +44,7 @@ function formatDate(iso: string | null | undefined) {
   return new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "2-digit" });
 }
 
-function daysUntil(iso: string | null | undefined) {
+function daysUntil(iso: string | null | undefined, colors: Colors) {
   if (!iso) return null;
   const diff = Math.ceil((new Date(iso).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   if (diff < 0) return { label: `${Math.abs(diff)}d de retraso`, color: colors.red };
@@ -61,6 +54,9 @@ function daysUntil(iso: string | null | undefined) {
 }
 
 export default function OrdersScreen() {
+  const { colors, typography } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [statusFilter, setStatusFilter] = useState("");
   const [receiveOrder, setReceiveOrder] = useState<Order | null>(null);
 
@@ -69,9 +65,7 @@ export default function OrdersScreen() {
   const updateMutation = useUpdateOrder();
 
   const advanceStatus = (order: Order) => {
-    const next: Partial<Record<OrderStatus, OrderStatus>> = {
-      PENDING: "IN_TRANSIT",
-    };
+    const next: Partial<Record<OrderStatus, OrderStatus>> = { PENDING: "IN_TRANSIT" };
     const nextStatus = next[order.status];
     if (nextStatus) {
       updateMutation.mutate({ id: order.id, data: { status: nextStatus } });
@@ -86,39 +80,47 @@ export default function OrdersScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.loading}>
+      <View style={[styles.loading, { backgroundColor: colors.bg }]}>
         <ActivityIndicator color={colors.gold} size="large" />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {/* ── Summary bar ── */}
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.summaryRow}>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryValue}>{MXN(totalCost)}</Text>
-          <Text style={styles.summaryLabel}>Costo total</Text>
+        <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.summaryValue, { color: colors.gold }]}>{MXN(totalCost)}</Text>
+          <Text style={typography.caption}>Costo total</Text>
         </View>
-        <View style={[styles.summaryCard, styles.summaryCardSmall]}>
+        <View style={[styles.summaryCard, styles.summaryCardSmall, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.summaryValue, { color: colors.yellow, fontSize: 20 }]}>{pendingCount}</Text>
-          <Text style={styles.summaryLabel}>Pendientes</Text>
+          <Text style={typography.caption}>Pendientes</Text>
         </View>
-        <View style={[styles.summaryCard, styles.summaryCardSmall]}>
+        <View style={[styles.summaryCard, styles.summaryCardSmall, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.summaryValue, { color: colors.gold, fontSize: 20 }]}>{transitCount}</Text>
-          <Text style={styles.summaryLabel}>En tránsito</Text>
+          <Text style={typography.caption}>En tránsito</Text>
         </View>
       </View>
 
-      {/* ── Filter tabs ── */}
       <View style={styles.filterRow}>
         {STATUS_FILTERS.map((f) => (
           <Pressable
             key={f.value}
-            style={[styles.filterTab, statusFilter === f.value && styles.filterTabActive]}
+            style={[
+              styles.filterTab,
+              { borderColor: colors.border, backgroundColor: colors.card },
+              statusFilter === f.value && { borderColor: colors.gold, backgroundColor: colors.goldDim + "33" },
+            ]}
             onPress={() => setStatusFilter(f.value)}
           >
-            <Text style={[styles.filterTabText, statusFilter === f.value && styles.filterTabTextActive]}>
+            <Text
+              style={[
+                typography.label,
+                { fontSize: 10, color: colors.textMuted },
+                statusFilter === f.value && { color: colors.gold },
+              ]}
+            >
               {f.label}
             </Text>
           </Pressable>
@@ -133,17 +135,17 @@ export default function OrdersScreen() {
         }
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
-          <OrderCard
-            order={item}
-            onAdvance={advanceStatus}
-            advancing={updateMutation.isPending}
-          />
+          <OrderCard order={item} onAdvance={advanceStatus} advancing={updateMutation.isPending} />
         )}
         ListEmptyComponent={
           <EmptyState
             icon="📋"
             title="Sin pedidos"
-            subtitle={statusFilter ? "No hay pedidos con este estado" : "Genera pedidos desde la pantalla de Producción"}
+            subtitle={
+              statusFilter
+                ? "No hay pedidos con este estado"
+                : "Genera pedidos desde la pantalla de Producción"
+            }
           />
         }
       />
@@ -155,7 +157,6 @@ export default function OrdersScreen() {
   );
 }
 
-// ─── Order Card ───────────────────────────────────────────────────────────────
 function OrderCard({
   order,
   onAdvance,
@@ -165,59 +166,66 @@ function OrderCard({
   onAdvance: (o: Order) => void;
   advancing: boolean;
 }) {
-  const cfg = STATUS_CONFIG[order.status];
-  const arrival = daysUntil(order.estimatedArrivalDate);
+  const { colors, typography } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
+  const statusConfig = useMemo(() => ({
+    PENDING:           { label: "Pendiente",     color: colors.yellow, bg: colors.yellowBg, icon: "time-outline" },
+    IN_TRANSIT:        { label: "En tránsito",    color: colors.gold,   bg: colors.goldDim + "44", icon: "airplane-outline" },
+    RECEIVED_COMPLETE: { label: "Recibido",       color: colors.green,  bg: colors.greenBg, icon: "checkmark-circle-outline" },
+    RECEIVED_PARTIAL:  { label: "Parc. recibido", color: colors.yellow, bg: colors.yellowBg, icon: "alert-circle-outline" },
+    CANCELLED:         { label: "Cancelado",      color: colors.none,   bg: colors.noneBg,  icon: "close-circle-outline" },
+  }), [colors]);
+
+  const cfg = statusConfig[order.status];
+  const arrival = daysUntil(order.estimatedArrivalDate, colors);
   const canAdvance = order.status === "PENDING" || order.status === "IN_TRANSIT";
   const cost = estimatedCost(order);
   const isEstimated = order.totalPaid == null;
 
   return (
-    <View style={styles.card}>
-      {/* Top row: material + status */}
+    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.cardTop}>
         <View style={styles.cardTitleBlock}>
-          <Text style={styles.cardMaterial} numberOfLines={1}>
+          <Text style={[typography.h4, { fontSize: 14 }]} numberOfLines={1}>
             {order.material?.name ?? "—"}
           </Text>
-          <Text style={styles.cardFolio}>{order.folio}</Text>
+          <Text style={[typography.caption, { fontFamily: "monospace" }]}>{order.folio}</Text>
         </View>
         <View style={[styles.statusPill, { backgroundColor: cfg.bg, borderColor: cfg.color }]}>
           <Ionicons name={cfg.icon as any} size={11} color={cfg.color} />
-          <Text style={[styles.statusPillText, { color: cfg.color }]}>{cfg.label}</Text>
+          <Text style={[typography.label, { fontSize: 9, color: cfg.color }]}>{cfg.label}</Text>
         </View>
       </View>
 
-      {/* Meta grid */}
       <View style={styles.metaGrid}>
-        <MetaCell label="Proveedor" value={order.supplier?.name?.split("(")[0].trim() ?? "—"} />
-        <MetaCell
-          label="Cantidad"
-          value={`${order.orderedQuantity} ${order.material?.unit ?? ""}`}
-        />
+        <MetaCell label="Proveedor" value={order.supplier?.name?.split("(")[0].trim() ?? "—"} typography={typography} colors={colors} />
+        <MetaCell label="Cantidad" value={`${order.orderedQuantity} ${order.material?.unit ?? ""}`} typography={typography} colors={colors} />
         <MetaCell
           label={isEstimated ? "Costo est." : "Costo final"}
           value={MXN(cost)}
           valueColor={isEstimated ? colors.textSecondary : colors.cream}
+          typography={typography}
+          colors={colors}
         />
-        <MetaCell label="Pedido" value={formatDate(order.orderDate)} />
+        <MetaCell label="Pedido" value={formatDate(order.orderDate)} typography={typography} colors={colors} />
       </View>
 
-      {/* Arrival chip */}
       {arrival && order.status !== "RECEIVED_COMPLETE" && order.status !== "CANCELLED" && (
         <View style={styles.arrivalChip}>
           <Ionicons name="calendar-outline" size={11} color={arrival.color} />
-          <Text style={[styles.arrivalText, { color: arrival.color }]}>
+          <Text style={[typography.caption, { color: arrival.color }]}>
             {arrival.label} · {formatDate(order.estimatedArrivalDate)}
           </Text>
         </View>
       )}
 
-      {/* Action */}
       {canAdvance && (
         <Pressable
           style={[
             styles.advanceBtn,
-            order.status === "IN_TRANSIT" && styles.advanceBtnReceive,
+            { borderColor: colors.gold + "88", backgroundColor: colors.surface },
+            order.status === "IN_TRANSIT" && { backgroundColor: colors.gold, borderColor: colors.gold },
             advancing && { opacity: 0.5 },
           ]}
           onPress={() => onAdvance(order)}
@@ -226,12 +234,12 @@ function OrderCard({
           {order.status === "PENDING" ? (
             <>
               <Ionicons name="airplane-outline" size={13} color={colors.gold} />
-              <Text style={styles.advanceBtnText}>Marcar en tránsito</Text>
+              <Text style={[typography.label, { fontSize: 10, color: colors.gold }]}>Marcar en tránsito</Text>
             </>
           ) : (
             <>
               <Ionicons name="checkmark-circle-outline" size={13} color={colors.bg} />
-              <Text style={[styles.advanceBtnText, { color: colors.bg }]}>Marcar recibido</Text>
+              <Text style={[typography.label, { fontSize: 10, color: colors.bg }]}>Marcar recibido</Text>
             </>
           )}
         </Pressable>
@@ -241,26 +249,35 @@ function OrderCard({
 }
 
 function MetaCell({
-  label,
-  value,
-  valueColor,
+  label, value, valueColor, typography, colors,
 }: {
   label: string;
   value: string;
   valueColor?: string;
+  typography: any;
+  colors: Colors;
 }) {
   return (
-    <View style={styles.metaCell}>
-      <Text style={styles.metaLabel}>{label}</Text>
-      <Text style={[styles.metaValue, valueColor ? { color: valueColor } : {}]} numberOfLines={1}>
+    <View style={metaCellStyles.cell}>
+      <Text style={typography.caption}>{label}</Text>
+      <Text
+        style={[typography.bodySmall, { fontWeight: "600", color: valueColor ?? colors.textPrimary, marginTop: 1 }]}
+        numberOfLines={1}
+      >
         {value}
       </Text>
     </View>
   );
 }
 
-// ─── Receive Modal ────────────────────────────────────────────────────────────
+const metaCellStyles = StyleSheet.create({
+  cell: { minWidth: 80, flex: 1 },
+});
+
 function ReceiveModal({ order, onClose }: { order: Order; onClose: () => void }) {
+  const { colors, typography } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const [qty, setQty] = useState(String(order.orderedQuantity));
   const [cost, setCost] = useState(
     order.totalPaid != null
@@ -285,15 +302,12 @@ function ReceiveModal({ order, onClose }: { order: Order; onClose: () => void })
         receivedBy: receivedBy || null,
         notes: null,
       });
-
       if (cost) {
         await ordersApi.update(order.id, { totalPaid: parseFloat(cost) || null });
       }
-
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["inventory"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-
       Alert.alert(
         "✅ Recepción registrada",
         `${qty} ${order.material?.unit ?? ""} de ${order.material?.name} agregados al inventario.`,
@@ -313,11 +327,11 @@ function ReceiveModal({ order, onClose }: { order: Order; onClose: () => void })
         style={styles.overlay}
       >
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
+        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
           <View style={styles.sheetHeader}>
             <View>
-              <Text style={styles.sheetTitle}>Registrar recepción</Text>
+              <Text style={[typography.h3, { marginBottom: 2 }]}>Registrar recepción</Text>
               <Text style={typography.caption}>{order.material?.name}</Text>
             </View>
             <Pressable onPress={onClose} hitSlop={8}>
@@ -325,36 +339,26 @@ function ReceiveModal({ order, onClose }: { order: Order; onClose: () => void })
             </Pressable>
           </View>
           <ScrollView contentContainerStyle={styles.sheetContent}>
-            <Field
-              label={`Cantidad recibida (${order.material?.unit ?? "unidad"})`}
-              value={qty}
-              onChangeText={setQty}
-              keyboardType="decimal-pad"
-            />
-            <Field
-              label="Costo final ($MXN)"
-              value={cost}
-              onChangeText={setCost}
-              keyboardType="decimal-pad"
-            />
-            <Field label="Recibido por" value={receivedBy} onChangeText={setReceivedBy} />
-            <Field label="Lote / folio proveedor" value={batchLot} onChangeText={setBatchLot} />
+            <ReceiveField label={`Cantidad recibida (${order.material?.unit ?? "unidad"})`} value={qty} onChangeText={setQty} keyboardType="decimal-pad" colors={colors} typography={typography} />
+            <ReceiveField label="Costo final ($MXN)" value={cost} onChangeText={setCost} keyboardType="decimal-pad" colors={colors} typography={typography} />
+            <ReceiveField label="Recibido por" value={receivedBy} onChangeText={setReceivedBy} colors={colors} typography={typography} />
+            <ReceiveField label="Lote / folio proveedor" value={batchLot} onChangeText={setBatchLot} colors={colors} typography={typography} />
 
-            <View style={styles.infoBox}>
-              <Text style={styles.infoText}>
+            <View style={[styles.infoBox, { backgroundColor: colors.greenBg, borderColor: colors.green }]}>
+              <Text style={[typography.caption, { color: colors.green }]}>
                 El stock se actualizará automáticamente al confirmar.
               </Text>
             </View>
 
             <Pressable
-              style={[styles.confirmBtn, loading && { opacity: 0.6 }]}
+              style={[styles.confirmBtn, { backgroundColor: colors.gold }, loading && { opacity: 0.6 }]}
               onPress={handleReceive}
               disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator color={colors.bg} />
               ) : (
-                <Text style={styles.confirmBtnText}>Confirmar recepción</Text>
+                <Text style={[typography.h4, { color: colors.bg }]}>Confirmar recepción</Text>
               )}
             </Pressable>
           </ScrollView>
@@ -364,22 +368,30 @@ function ReceiveModal({ order, onClose }: { order: Order; onClose: () => void })
   );
 }
 
-function Field({
-  label,
-  value,
-  onChangeText,
-  keyboardType,
+function ReceiveField({
+  label, value, onChangeText, keyboardType, colors, typography,
 }: {
   label: string;
   value: string;
   onChangeText: (v: string) => void;
   keyboardType?: "decimal-pad" | "number-pad";
+  colors: Colors;
+  typography: any;
 }) {
   return (
     <View style={{ marginBottom: spacing.sm }}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+      <Text style={[typography.label, { marginBottom: 4 }]}>{label}</Text>
       <TextInput
-        style={styles.fieldInput}
+        style={{
+          backgroundColor: colors.card,
+          borderRadius: radius.md,
+          borderWidth: 1,
+          borderColor: colors.border,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
+          color: colors.textPrimary,
+          fontSize: 15,
+        }}
         value={value}
         onChangeText={onChangeText}
         keyboardType={keyboardType ?? "default"}
@@ -389,119 +401,115 @@ function Field({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg },
-  loading: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
-  listContent: { paddingBottom: spacing.xxl },
+function makeStyles(colors: Colors) {
+  return StyleSheet.create({
+    container: { flex: 1 },
+    loading: { flex: 1, alignItems: "center", justifyContent: "center" },
+    listContent: { paddingBottom: spacing.xxl },
 
-  // Summary
-  summaryRow: {
-    flexDirection: "row", gap: spacing.sm,
-    paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.xs,
-  },
-  summaryCard: {
-    flex: 2, backgroundColor: colors.card, borderRadius: radius.md,
-    padding: spacing.md, borderWidth: 1, borderColor: colors.border,
-  },
-  summaryCardSmall: { flex: 1 },
-  summaryValue: { fontSize: 18, fontWeight: "700", color: colors.gold, letterSpacing: -0.5 },
-  summaryLabel: { ...typography.caption, marginTop: 2 },
+    summaryRow: {
+      flexDirection: "row",
+      gap: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.xs,
+    },
+    summaryCard: {
+      flex: 2,
+      borderRadius: radius.md,
+      padding: spacing.md,
+      borderWidth: 1,
+    },
+    summaryCardSmall: { flex: 1 },
+    summaryValue: { fontSize: 18, fontWeight: "700", letterSpacing: -0.5 },
 
-  // Filter tabs
-  filterRow: {
-    flexDirection: "row", flexWrap: "wrap", gap: spacing.xs,
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-  },
-  filterTab: {
-    paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
-    borderRadius: radius.full, borderWidth: 1,
-    borderColor: colors.border, backgroundColor: colors.card,
-  },
-  filterTabActive: { borderColor: colors.gold, backgroundColor: colors.goldDim + "33" },
-  filterTabText: { ...typography.label, fontSize: 10, color: colors.textMuted },
-  filterTabTextActive: { color: colors.gold },
+    filterRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing.xs,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    filterTab: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: radius.full,
+      borderWidth: 1,
+    },
 
-  // Card
-  card: {
-    marginHorizontal: spacing.md, marginBottom: spacing.sm,
-    backgroundColor: colors.card, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border,
-    padding: spacing.md, gap: spacing.sm,
-  },
-  cardTop: {
-    flexDirection: "row", alignItems: "flex-start",
-    justifyContent: "space-between", gap: spacing.sm,
-  },
-  cardTitleBlock: { flex: 1, gap: 2 },
-  cardMaterial: { ...typography.h4, fontSize: 14 },
-  cardFolio: { ...typography.caption, fontFamily: "monospace" },
-  statusPill: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    paddingHorizontal: spacing.sm, paddingVertical: 3,
-    borderRadius: radius.full, borderWidth: 1,
-  },
-  statusPillText: { ...typography.label, fontSize: 9 },
+    card: {
+      marginHorizontal: spacing.md,
+      marginBottom: spacing.sm,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      padding: spacing.md,
+      gap: spacing.sm,
+    },
+    cardTop: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: spacing.sm,
+    },
+    cardTitleBlock: { flex: 1, gap: 2 },
+    statusPill: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 3,
+      borderRadius: radius.full,
+      borderWidth: 1,
+    },
+    metaGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+    arrivalChip: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start" },
+    advanceBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.xs,
+      alignSelf: "flex-start",
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs + 2,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+    },
 
-  metaGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  metaCell: { minWidth: 80, flex: 1 },
-  metaLabel: { ...typography.caption },
-  metaValue: { ...typography.bodySmall, fontWeight: "600", color: colors.textPrimary, marginTop: 1 },
+    overlay: { flex: 1, justifyContent: "flex-end" },
+    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)" },
+    sheet: {
+      borderTopLeftRadius: radius.xl,
+      borderTopRightRadius: radius.xl,
+      maxHeight: "85%",
+    },
+    handle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      alignSelf: "center",
+      marginTop: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    sheetHeader: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      paddingHorizontal: spacing.md,
+      paddingBottom: spacing.md,
+    },
+    sheetContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.xxl },
 
-  arrivalChip: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    alignSelf: "flex-start",
-  },
-  arrivalText: { ...typography.caption },
-
-  advanceBtn: {
-    flexDirection: "row", alignItems: "center", gap: spacing.xs,
-    alignSelf: "flex-start",
-    paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2,
-    borderRadius: radius.sm, borderWidth: 1, borderColor: colors.gold + "88",
-    backgroundColor: colors.surface,
-  },
-  advanceBtnReceive: {
-    backgroundColor: colors.gold, borderColor: colors.gold,
-  },
-  advanceBtnText: { ...typography.label, fontSize: 10, color: colors.gold },
-
-  // Receive modal
-  overlay: { flex: 1, justifyContent: "flex-end" },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)" },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
-    maxHeight: "85%",
-  },
-  handle: {
-    width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border,
-    alignSelf: "center", marginTop: spacing.sm, marginBottom: spacing.md,
-  },
-  sheetHeader: {
-    flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between",
-    paddingHorizontal: spacing.md, paddingBottom: spacing.md,
-  },
-  sheetTitle: { ...typography.h3, marginBottom: 2 },
-  sheetContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.xxl },
-
-  fieldLabel: { ...typography.label, marginBottom: 4 },
-  fieldInput: {
-    backgroundColor: colors.card, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.border,
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    color: colors.textPrimary, fontSize: 15, marginBottom: 0,
-  },
-
-  infoBox: {
-    backgroundColor: colors.greenBg, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.green,
-    padding: spacing.sm, marginTop: spacing.xs, marginBottom: spacing.sm,
-  },
-  infoText: { ...typography.caption, color: colors.green },
-
-  confirmBtn: {
-    backgroundColor: colors.gold, borderRadius: radius.md,
-    paddingVertical: spacing.md, alignItems: "center", marginTop: spacing.xs,
-  },
-  confirmBtnText: { ...typography.h4, color: colors.bg },
-});
+    infoBox: {
+      borderRadius: radius.md,
+      borderWidth: 1,
+      padding: spacing.sm,
+      marginTop: spacing.xs,
+      marginBottom: spacing.sm,
+    },
+    confirmBtn: {
+      borderRadius: radius.md,
+      paddingVertical: spacing.md,
+      alignItems: "center",
+      marginTop: spacing.xs,
+    },
+  });
+}

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   ScrollView,
   View,
@@ -9,7 +9,8 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { colors, spacing, radius, typography, shadows } from "../constants/theme";
+import { spacing, radius, Colors } from "../constants/theme";
+import { useTheme } from "../context/ThemeContext";
 import { KPICard } from "../components/KPICard";
 import { AlertBadge } from "../components/AlertBadge";
 import { SectionHeader } from "../components/SectionHeader";
@@ -32,6 +33,9 @@ const STYLE_EMOJIS: Record<string, string> = {
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const { colors, typography } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   const { data: summary, isLoading, isError, refetch, isRefetching } = useDashboardSummary();
   const { data: alerts } = useInventoryAlerts();
 
@@ -40,7 +44,7 @@ export default function DashboardScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.loading}>
+      <View style={[styles.loading, { backgroundColor: colors.bg }]}>
         <ActivityIndicator color={colors.gold} size="large" />
       </View>
     );
@@ -48,13 +52,15 @@ export default function DashboardScreen() {
 
   if (isError || !summary) {
     return (
-      <View style={styles.loading}>
-        <Text style={styles.errorTitle}>Sin conexión con la API</Text>
-        <Text style={styles.errorSub}>
+      <View style={[styles.loading, { backgroundColor: colors.bg }]}>
+        <Text style={[typography.h3, { textAlign: "center", marginBottom: spacing.xs }]}>
+          Sin conexión con la API
+        </Text>
+        <Text style={[typography.bodySmall, { textAlign: "center", marginBottom: spacing.lg }]}>
           Asegúrate de que el servidor esté corriendo en localhost:3000
         </Text>
-        <Pressable onPress={() => refetch()} style={styles.retryBtn}>
-          <Text style={styles.retryText}>Reintentar</Text>
+        <Pressable onPress={() => refetch()} style={[styles.retryBtn, { borderColor: colors.gold }]}>
+          <Text style={[typography.label, { color: colors.gold }]}>Reintentar</Text>
         </Pressable>
       </View>
     );
@@ -64,19 +70,14 @@ export default function DashboardScreen() {
 
   return (
     <ScrollView
-      style={styles.scroll}
+      style={[styles.scroll, { backgroundColor: colors.bg }]}
       contentContainerStyle={styles.content}
       refreshControl={
-        <RefreshControl
-          refreshing={isRefetching}
-          onRefresh={refetch}
-          tintColor={colors.gold}
-        />
+        <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.gold} />
       }
     >
-      {/* ── Header date ── */}
       <View style={styles.dateRow}>
-        <Text style={styles.dateText}>
+        <Text style={typography.bodySmall}>
           {new Date().toLocaleDateString("es-MX", {
             weekday: "long",
             day: "numeric",
@@ -85,82 +86,50 @@ export default function DashboardScreen() {
         </Text>
       </View>
 
-      {/* ── Alert summary bar ── */}
       {(s.alerts.red > 0 || s.alerts.yellow > 0) && (
         <Pressable
-          style={[styles.alertBar, s.alerts.red > 0 ? styles.alertBarRed : styles.alertBarYellow]}
+          style={[
+            styles.alertBar,
+            s.alerts.red > 0
+              ? { backgroundColor: colors.redBg, borderColor: colors.red }
+              : { backgroundColor: colors.yellowBg, borderColor: colors.yellow },
+          ]}
           onPress={() => router.push("/(tabs)/inventory")}
         >
-          <Text style={[styles.alertBarText, s.alerts.red > 0 ? { color: colors.red } : { color: colors.yellow }]}>
+          <Text
+            style={[
+              typography.bodySmall,
+              { fontWeight: "600", flex: 1, color: s.alerts.red > 0 ? colors.red : colors.yellow },
+            ]}
+          >
             {s.alerts.red > 0
               ? `🔴 ${s.alerts.red} materiales PEDIR YA · ${s.alerts.yellow} pedir pronto`
               : `🟡 ${s.alerts.yellow} materiales pedir pronto`}
           </Text>
-          <Text style={[styles.alertBarAction, { color: s.alerts.red > 0 ? colors.red : colors.yellow }]}>
+          <Text style={[typography.label, { color: s.alerts.red > 0 ? colors.red : colors.yellow }]}>
             Ver →
           </Text>
         </Pressable>
       )}
 
-      {/* ── KPI row 1: Alerts ── */}
       <SectionHeader title="ALERTAS JIT (HOY)" action="Ver inventario" onAction={() => router.push("/(tabs)/inventory")} />
       <View style={styles.kpiRow}>
-        <KPICard
-          label="🔴 PEDIR YA"
-          value={s.alerts.red}
-          sub="materiales críticos"
-          accent="red"
-          onPress={() => router.push("/(tabs)/inventory")}
-        />
-        <KPICard
-          label="🟡 PEDIR PRONTO"
-          value={s.alerts.yellow}
-          sub="materiales con alerta"
-          accent="yellow"
-          onPress={() => router.push("/(tabs)/inventory")}
-        />
-        <KPICard
-          label="🟢 OK"
-          value={s.alerts.green}
-          sub="materiales en stock"
-          accent="green"
-        />
+        <KPICard label="🔴 PEDIR YA" value={s.alerts.red} sub="materiales críticos" accent="red" onPress={() => router.push("/(tabs)/inventory")} />
+        <KPICard label="🟡 PEDIR PRONTO" value={s.alerts.yellow} sub="materiales con alerta" accent="yellow" onPress={() => router.push("/(tabs)/inventory")} />
+        <KPICard label="🟢 OK" value={s.alerts.green} sub="materiales en stock" accent="green" />
       </View>
 
-      {/* ── KPI row 2: Production & Spend ── */}
       <SectionHeader title="PRODUCCIÓN & GASTO" />
       <View style={styles.kpiRow}>
-        <KPICard
-          label="LOTES · 7 DÍAS"
-          value={s.upcoming.batches}
-          sub={`${s.upcoming.plans.length} estilos planificados`}
-          accent="gold"
-          onPress={() => router.push("/(tabs)/production")}
-        />
-        <KPICard
-          label="KG MALTA · 7 DÍAS"
-          value={s.upcoming.maltKg.toFixed(0)}
-          sub="kg necesarios"
-          accent="cream"
-        />
-        <KPICard
-          label="GASTO ESTE MES"
-          value={MXN(s.monthlySpend.total)}
-          sub={`${s.monthlySpend.orderCount} pedidos`}
-          accent="gold"
-          onPress={() => router.push("/(tabs)/orders")}
-        />
+        <KPICard label="LOTES · 7 DÍAS" value={s.upcoming.batches} sub={`${s.upcoming.plans.length} estilos planificados`} accent="gold" onPress={() => router.push("/(tabs)/production")} />
+        <KPICard label="KG MALTA · 7 DÍAS" value={s.upcoming.maltKg.toFixed(0)} sub="kg necesarios" accent="cream" />
+        <KPICard label="GASTO ESTE MES" value={MXN(s.monthlySpend.total)} sub={`${s.monthlySpend.orderCount} pedidos`} accent="gold" onPress={() => router.push("/(tabs)/orders")} />
       </View>
 
-      {/* ── Critical alerts list ── */}
       {redItems.length > 0 && (
         <>
-          <SectionHeader
-            title="PEDIR HOY"
-            action="Ver todos"
-            onAction={() => router.push("/(tabs)/inventory")}
-          />
-          <View style={styles.alertList}>
+          <SectionHeader title="PEDIR HOY" action="Ver todos" onAction={() => router.push("/(tabs)/inventory")} />
+          <View style={[styles.alertList, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {redItems.slice(0, 6).map((item) => (
               <AlertItem key={item.id} item={item} />
             ))}
@@ -168,42 +137,18 @@ export default function DashboardScreen() {
         </>
       )}
 
-      {/* ── Upcoming production ── */}
       {s.upcoming.plans.length > 0 && (
         <>
-          <SectionHeader
-            title="PRÓXIMA PRODUCCIÓN"
-            action="Ver plan"
-            onAction={() => router.push("/(tabs)/production")}
-          />
-          <View style={styles.prodList}>
+          <SectionHeader title="PRÓXIMA PRODUCCIÓN" action="Ver plan" onAction={() => router.push("/(tabs)/production")} />
+          <View style={[styles.prodList, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {s.upcoming.plans.slice(0, 4).map((plan) => (
-              <View key={plan.id} style={styles.prodCard}>
-                <Text style={styles.prodEmoji}>
-                  {STYLE_EMOJIS[plan.style] ?? "🍺"}
-                </Text>
-                <View style={styles.prodInfo}>
-                  <Text style={styles.prodStyle}>{plan.style}</Text>
-                  <Text style={styles.prodSub}>
-                    {plan.plannedBatches} lote{plan.plannedBatches > 1 ? "s" : ""} ·{" "}
-                    {new Date(plan.productionDate).toLocaleDateString("es-MX", {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short",
-                    })}
-                  </Text>
-                </View>
-                <View style={styles.prodNums}>
-                  <Text style={styles.prodNumVal}>{plan.totalMaltKg}kg</Text>
-                  <Text style={styles.prodNumLabel}>malta</Text>
-                </View>
-              </View>
+              <ProdCard key={plan.id} plan={plan} colors={colors} typography={typography} borderColor={colors.border} />
             ))}
           </View>
         </>
       )}
 
-      {redItems.length === 0 && s.alerts.yellow === 0 && (
+      {redItems.length === 0 && yellowItems.length === 0 && (
         <View style={{ marginTop: spacing.xl }}>
           <EmptyState icon="✅" title="Todo en orden" subtitle="No hay alertas activas. Sigue así." />
         </View>
@@ -215,6 +160,7 @@ export default function DashboardScreen() {
 }
 
 function AlertItem({ item }: { item: InventoryRow }) {
+  const { colors, typography } = useTheme();
   const mat = item.material!;
   const coverage =
     item.dailyConsumption > 0
@@ -222,105 +168,130 @@ function AlertItem({ item }: { item: InventoryRow }) {
       : 0;
 
   return (
-    <View style={styles.alertItem}>
+    <View style={[alertItemStyles.row, { borderBottomColor: colors.border }]}>
       <AlertBadge status={item.alertStatus} compact />
-      <View style={styles.alertItemInfo}>
-        <Text style={styles.alertItemName} numberOfLines={1}>{mat.name}</Text>
-        <Text style={styles.alertItemSub}>
+      <View style={alertItemStyles.info}>
+        <Text style={[typography.h4, { fontSize: 13 }]} numberOfLines={1}>{mat.name}</Text>
+        <Text style={typography.caption}>
           Stock: {item.currentStock} {mat.unit} · {coverage}d cobertura
         </Text>
       </View>
-      <View style={styles.alertItemRight}>
-        <Text style={styles.alertItemQty}>
+      <View style={alertItemStyles.right}>
+        <Text style={[typography.bodySmall, { fontWeight: "700", color: colors.red }]}>
           {item.quantityToOrder.toFixed(1)} {mat.unit}
         </Text>
-        <Text style={styles.alertItemLabel}>a pedir</Text>
+        <Text style={typography.caption}>a pedir</Text>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingBottom: spacing.xl },
-  loading: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg, padding: spacing.lg },
-  errorTitle: { ...typography.h3, color: colors.textPrimary, textAlign: "center", marginBottom: spacing.xs },
-  errorSub: { ...typography.bodySmall, color: colors.textSecondary, textAlign: "center", marginBottom: spacing.lg },
-  retryBtn: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.gold },
-  retryText: { ...typography.label, color: colors.gold },
-
-  dateRow: { paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.xs },
-  dateText: { ...typography.bodySmall, textTransform: "capitalize" },
-
-  alertBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  alertBarRed: { backgroundColor: colors.redBg, borderColor: colors.red },
-  alertBarYellow: { backgroundColor: colors.yellowBg, borderColor: colors.yellow },
-  alertBarText: { ...typography.bodySmall, fontWeight: "600", flex: 1 },
-  alertBarAction: { ...typography.label, fontSize: 11, marginLeft: spacing.sm },
-
-  kpiRow: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    flexWrap: "wrap",
-  },
-
-  alertList: {
-    marginHorizontal: spacing.md,
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: "hidden",
-  },
-  alertItem: {
+const alertItemStyles = StyleSheet.create({
+  row: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
-  alertItemInfo: { flex: 1, gap: 2 },
-  alertItemName: { ...typography.h4, fontSize: 13 },
-  alertItemSub: { ...typography.caption },
-  alertItemRight: { alignItems: "flex-end" },
-  alertItemQty: { ...typography.bodySmall, fontWeight: "700", color: colors.red },
-  alertItemLabel: { ...typography.caption },
-
-  prodList: {
-    marginHorizontal: spacing.md,
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: "hidden",
-  },
-  prodCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  prodEmoji: { fontSize: 22, width: 32, textAlign: "center" },
-  prodInfo: { flex: 1, gap: 2 },
-  prodStyle: { ...typography.h4, fontSize: 14 },
-  prodSub: { ...typography.caption },
-  prodNums: { alignItems: "flex-end" },
-  prodNumVal: { ...typography.bodySmall, fontWeight: "700", color: colors.cream },
-  prodNumLabel: { ...typography.caption },
+  info: { flex: 1, gap: 2 },
+  right: { alignItems: "flex-end" },
 });
+
+function ProdCard({
+  plan,
+  colors,
+  typography,
+  borderColor,
+}: {
+  plan: any;
+  colors: Colors;
+  typography: any;
+  borderColor: string;
+}) {
+  return (
+    <View style={[prodCardStyles.card, { borderBottomColor: borderColor }]}>
+      <Text style={prodCardStyles.emoji}>{STYLE_EMOJIS[plan.style] ?? "🍺"}</Text>
+      <View style={prodCardStyles.info}>
+        <Text style={[typography.h4, { fontSize: 14 }]}>{plan.style}</Text>
+        <Text style={typography.caption}>
+          {plan.plannedBatches} lote{plan.plannedBatches > 1 ? "s" : ""} ·{" "}
+          {new Date(plan.productionDate).toLocaleDateString("es-MX", {
+            weekday: "short",
+            day: "numeric",
+            month: "short",
+          })}
+        </Text>
+      </View>
+      <View style={prodCardStyles.nums}>
+        <Text style={[typography.bodySmall, { fontWeight: "700", color: colors.cream }]}>
+          {plan.totalMaltKg}kg
+        </Text>
+        <Text style={typography.caption}>malta</Text>
+      </View>
+    </View>
+  );
+}
+
+const prodCardStyles = StyleSheet.create({
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    borderBottomWidth: 1,
+  },
+  emoji: { fontSize: 22, width: 32, textAlign: "center" },
+  info: { flex: 1, gap: 2 },
+  nums: { alignItems: "flex-end" },
+});
+
+function makeStyles(colors: Colors) {
+  return StyleSheet.create({
+    scroll: { flex: 1 },
+    content: { paddingBottom: spacing.xl },
+    loading: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.lg },
+    retryBtn: {
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm,
+      borderRadius: radius.md,
+      borderWidth: 1,
+    },
+    dateRow: {
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.xs,
+    },
+    alertBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginHorizontal: spacing.md,
+      marginBottom: spacing.xs,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radius.md,
+      borderWidth: 1,
+    },
+    kpiRow: {
+      flexDirection: "row",
+      gap: spacing.sm,
+      paddingHorizontal: spacing.md,
+      flexWrap: "wrap",
+    },
+    alertList: {
+      marginHorizontal: spacing.md,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      overflow: "hidden",
+    },
+    prodList: {
+      marginHorizontal: spacing.md,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      overflow: "hidden",
+    },
+  });
+}
