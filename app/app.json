@@ -35,11 +35,22 @@
       "expo-secure-store"
     ],
     "extra": {
-      "router": { "root": "." },
-      "apiUrl": "https://alexaapp-production.up.railway.app/api"
+      "router": {
+        "root": "."
+      },
+      "apiUrl": "https://alexaapp-production.up.railway.app/api",
+      "eas": {
+        "projectId": "896228fd-c932-4b68-a716-80ac277983aa"
+      }
     },
     "experiments": {
       "typedRoutes": true
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/896228fd-c932-4b68-a716-80ac277983aa"
     }
   }
 }
