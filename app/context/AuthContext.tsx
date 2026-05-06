@@ -10,12 +10,12 @@ import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import * as LocalAuthentication from "expo-local-authentication";
 import { authApi, AuthUser, setApiToken } from "../services/api";
+import type { Role } from "../types";
 
 const REFRESH_KEY = "rrey_refresh_token";
 const BIO_KEY = "rrey_biometric_token";
 const BIO_EMAIL_KEY = "rrey_biometric_email";
 
-// SecureStore falls back to localStorage on web
 const store = {
   get: (key: string) =>
     Platform.OS === "web"
@@ -31,14 +31,13 @@ const store = {
       : SecureStore.deleteItemAsync(key),
 };
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 export interface AuthState {
   user: AuthUser | null;
   accessToken: string | null;
   isLoading: boolean;
   biometricAvailable: boolean;
   biometricEnabled: boolean;
-  biometricEmail: string | null; // email of the account that enrolled Face ID
+  biometricEmail: string | null;
 }
 
 export interface AuthContextType extends AuthState {
@@ -48,11 +47,11 @@ export interface AuthContextType extends AuthState {
   enableBiometrics: () => Promise<void>;
   disableBiometrics: () => Promise<void>;
   loginWithBiometrics: () => Promise<void>;
+  hasRole: (roles: Role[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// ─── Provider ─────────────────────────────────────────────────────────────────
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -63,11 +62,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     biometricEmail: null,
   });
 
-  // Ref to always access current user without stale closure
   const userRef = useRef<AuthUser | null>(null);
   useEffect(() => { userRef.current = state.user; }, [state.user]);
 
-  // Bootstrap: restore session + biometric state from SecureStore
   useEffect(() => {
     async function bootstrap() {
       let biometricAvailable = false;
@@ -91,10 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const { accessToken } = await authApi.refresh(refreshToken);
           setApiToken(accessToken);
           const user = await authApi.me();
-          setState({
-            user, accessToken, isLoading: false,
-            biometricAvailable, biometricEnabled, biometricEmail,
-          });
+          setState({ user, accessToken, isLoading: false, biometricAvailable, biometricEnabled, biometricEmail });
           return;
         } catch {
           await store.del(REFRESH_KEY).catch(() => {});
@@ -133,17 +127,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     const refreshToken = await store.get(REFRESH_KEY);
-    try {
-      if (refreshToken) await authApi.logout(refreshToken);
-    } catch {}
+    try { if (refreshToken) await authApi.logout(refreshToken); } catch {}
     await store.del(REFRESH_KEY).catch(() => {});
-    // Keep BIO_KEY and BIO_EMAIL_KEY so Face ID remains available on next login
     setApiToken(null);
     setState((s) => ({ ...s, user: null, accessToken: null }));
   }, []);
 
-  // Prompts biometric, then creates a DEDICATED server session for biometric use
-  // (separate from the regular session so logout doesn't invalidate it)
   const enableBiometrics = useCallback(async () => {
     const result = await LocalAuthentication.authenticateAsync({
       promptMessage: "Confirma tu identidad para activar Face ID",
@@ -151,11 +140,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       fallbackLabel: "Usar contraseña",
     });
     if (!result.success) throw new Error("Autenticación biométrica cancelada");
-
     const user = userRef.current;
     if (!user) throw new Error("No hay sesión activa");
-
-    // Create a dedicated refresh token that lives independently of the regular session
     const { refreshToken: bioToken } = await authApi.createBiometricToken();
     await store.set(BIO_KEY, bioToken);
     await store.set(BIO_EMAIL_KEY, user.email);
@@ -168,29 +154,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState((s) => ({ ...s, biometricEnabled: false, biometricEmail: null }));
   }, []);
 
-  // Biometric prompt → use dedicated bio token → create a SEPARATE regular session
   const loginWithBiometrics = useCallback(async () => {
     const result = await LocalAuthentication.authenticateAsync({
       promptMessage: "Inicia sesión con Face ID",
       cancelLabel: "Usar contraseña",
     });
     if (!result.success) throw new Error("Autenticación biométrica cancelada");
-
     const bioToken = await store.get(BIO_KEY);
     if (!bioToken) throw new Error("No hay sesión biométrica guardada");
-
-    // Step 1: use the bio token to get an access token
     const { accessToken } = await authApi.refresh(bioToken);
     setApiToken(accessToken);
     const user = await authApi.me();
-
-    // Step 2: create a FRESH regular session for REFRESH_KEY
-    // This keeps BIO_KEY independent — logout deletes the regular session only
     const { refreshToken: sessionToken } = await authApi.createSession();
     await store.set(REFRESH_KEY, sessionToken);
-
     setState((s) => ({ ...s, user, accessToken }));
   }, []);
+
+  const hasRole = useCallback(
+    (roles: Role[]) => {
+      const role = state.user?.role;
+      if (!role) return false;
+      return roles.includes(role as Role);
+    },
+    [state.user]
+  );
 
   return (
     <AuthContext.Provider
@@ -202,6 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         enableBiometrics,
         disableBiometrics,
         loginWithBiometrics,
+        hasRole,
       }}
     >
       {children}
@@ -209,7 +197,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");

@@ -1,27 +1,20 @@
 import React, { useState, useMemo, useCallback } from "react";
 import {
-  View,
-  FlatList,
-  StyleSheet,
-  Text,
-  Modal,
-  ScrollView,
-  TextInput,
-  Pressable,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  RefreshControl,
+  View, FlatList, StyleSheet, Text, Modal, ScrollView, TextInput,
+  Pressable, KeyboardAvoidingView, Platform, ActivityIndicator,
+  RefreshControl, Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { spacing, radius, Colors } from "../constants/theme";
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
 import { SearchBar } from "../components/SearchBar";
 import { FilterChips } from "../components/FilterChips";
 import { InventoryRow } from "../components/InventoryRow";
 import { AlertBadge } from "../components/AlertBadge";
 import { EmptyState } from "../components/EmptyState";
 import { useInventory, useUpdateInventory } from "../hooks/useInventory";
+import { inventoryApi } from "../services/api";
 import type { InventoryRow as IRow } from "../types";
 
 const ALERT_FILTERS = [
@@ -30,7 +23,6 @@ const ALERT_FILTERS = [
   { label: "🟡 Pedir pronto", value: "YELLOW" },
   { label: "🟢 OK", value: "GREEN" },
 ];
-
 const TYPE_FILTERS = [
   { label: "Todos", value: "" },
   { label: "Lúpulo", value: "LUPULO" },
@@ -43,17 +35,20 @@ const TYPE_FILTERS = [
 export default function InventoryScreen() {
   const { colors, typography } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { hasRole } = useAuth();
+
+  const canImport = hasRole(["DEVELOPER", "SUPERVISOR"]);
 
   const [search, setSearch] = useState("");
   const [alertFilter, setAlertFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [selected, setSelected] = useState<IRow | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const params = useMemo(
     () => ({ alert: alertFilter || undefined, type: typeFilter || undefined }),
     [alertFilter, typeFilter]
   );
-
   const { data, isLoading, refetch, isRefetching } = useInventory(params);
   const updateMutation = useUpdateInventory();
 
@@ -77,7 +72,17 @@ export default function InventoryScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.searchRow}>
-        <SearchBar value={search} onChangeText={setSearch} placeholder="Buscar material..." />
+        <View style={{ flex: 1 }}>
+          <SearchBar value={search} onChangeText={setSearch} placeholder="Buscar material..." />
+        </View>
+        {canImport && (
+          <Pressable
+            style={[styles.importBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => setShowImportModal(true)}
+          >
+            <Ionicons name="cloud-upload-outline" size={18} color={colors.textSecondary} />
+          </Pressable>
+        )}
       </View>
 
       <FilterChips chips={ALERT_FILTERS} selected={alertFilter} onSelect={setAlertFilter} />
@@ -90,9 +95,7 @@ export default function InventoryScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <InventoryRow item={item} onPress={handlePress} />}
         contentContainerStyle={{ paddingBottom: 20 }}
-        refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.gold} />
-        }
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.gold} />}
         ListEmptyComponent={
           <EmptyState icon="🔍" title="Sin resultados" subtitle="Intenta con otro filtro o búsqueda" />
         }
@@ -111,7 +114,132 @@ export default function InventoryScreen() {
           saving={updateMutation.isPending}
         />
       )}
+
+      {showImportModal && (
+        <ImportModal onClose={() => { setShowImportModal(false); refetch(); }} />
+      )}
     </View>
+  );
+}
+
+function ImportModal({ onClose }: { onClose: () => void }) {
+  const { colors, typography } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const [downloading, setDownloading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState<{ updated: number; errors: any[]; total: number } | null>(null);
+
+  const handleDownloadTemplate = async () => {
+    setDownloading(true);
+    try {
+      if (Platform.OS === "web") {
+        const blob = await inventoryApi.downloadTemplate();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "inventario_template.xlsx";
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        Alert.alert("Template", "Descarga disponible solo en web. Usa el navegador para descargar.");
+      }
+    } catch (e: any) {
+      Alert.alert("Error", e.message);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleImport = async () => {
+    if (Platform.OS === "web") {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".xlsx,.xls";
+      input.onchange = async (e: any) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setImporting(true);
+        try {
+          const res = await inventoryApi.import(file);
+          setResult(res);
+        } catch (err: any) {
+          Alert.alert("Error", err.message);
+        } finally {
+          setImporting(false);
+        }
+      };
+      input.click();
+    } else {
+      Alert.alert("Importar Excel", "Importación disponible solo en web.");
+    }
+  };
+
+  return (
+    <Modal transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.overlay}>
+        <Pressable style={styles.backdrop} onPress={onClose} />
+        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
+          <View style={styles.sheetHeader}>
+            <Text style={typography.h3}>Importar inventario Excel</Text>
+            <Pressable onPress={onClose} hitSlop={8}>
+              <Ionicons name="close" size={22} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+
+          <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md }}>
+            <Text style={[typography.bodySmall, { color: colors.textSecondary }]}>
+              Descarga la plantilla, edita el stock y consumo diario, y luego importa el archivo.
+              Los materiales se identifican por su columna "id".
+            </Text>
+
+            <Pressable
+              style={[styles.actionBtn, { backgroundColor: colors.card, borderColor: colors.border }, downloading && { opacity: 0.6 }]}
+              onPress={handleDownloadTemplate}
+              disabled={downloading}
+            >
+              {downloading
+                ? <ActivityIndicator color={colors.gold} size="small" />
+                : <Ionicons name="download-outline" size={18} color={colors.gold} />
+              }
+              <Text style={[typography.h4, { color: colors.gold }]}>
+                {downloading ? "Descargando..." : "Descargar plantilla"}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.actionBtn, { backgroundColor: colors.gold }, importing && { opacity: 0.6 }]}
+              onPress={handleImport}
+              disabled={importing}
+            >
+              {importing
+                ? <ActivityIndicator color={colors.bg} size="small" />
+                : <Ionicons name="cloud-upload-outline" size={18} color={colors.bg} />
+              }
+              <Text style={[typography.h4, { color: colors.bg }]}>
+                {importing ? "Importando..." : "Seleccionar archivo"}
+              </Text>
+            </Pressable>
+
+            {result && (
+              <View style={[{ padding: spacing.md, borderRadius: radius.md, borderWidth: 1 }, { backgroundColor: colors.greenBg, borderColor: colors.green }]}>
+                <Text style={[typography.h4, { color: colors.green }]}>
+                  Importación completada
+                </Text>
+                <Text style={[typography.bodySmall, { color: colors.green, marginTop: 4 }]}>
+                  {result.updated} de {result.total} filas actualizadas
+                </Text>
+                {result.errors.length > 0 && (
+                  <Text style={[typography.caption, { color: colors.gold, marginTop: 4 }]}>
+                    {result.errors.length} error(es). Revisa los IDs de materiales.
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -125,7 +253,6 @@ interface EditModalProps {
 function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
   const { colors, typography } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-
   const mat = item.material!;
   const [stock, setStock] = useState(String(item.currentStock));
   const [consumption, setConsumption] = useState(String(item.dailyConsumption));
@@ -138,19 +265,13 @@ function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
 
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.overlay}
-      >
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
           <View style={[styles.handle, { backgroundColor: colors.border }]} />
-
           <View style={styles.sheetHeader}>
             <View style={{ flex: 1 }}>
-              <Text style={[typography.h3, { marginBottom: spacing.xs }]} numberOfLines={2}>
-                {mat.name}
-              </Text>
+              <Text style={[typography.h3, { marginBottom: spacing.xs }]} numberOfLines={2}>{mat.name}</Text>
               <AlertBadge status={item.alertStatus} />
             </View>
             <Pressable onPress={onClose} hitSlop={8}>
@@ -162,8 +283,7 @@ function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
             {coverage !== null && (
               <View style={[styles.coveragePill, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Text style={typography.bodySmall}>
-                  Cobertura actual:{" "}
-                  <Text style={{ color: colors.gold }}>{coverage} días</Text>
+                  Cobertura actual: <Text style={{ color: colors.gold }}>{coverage} días</Text>
                 </Text>
               </View>
             )}
@@ -175,27 +295,24 @@ function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
             </View>
 
             <View style={styles.infoRow}>
-              <InfoCell label="Precio unit." value={`$${mat.unitPrice}`} colors={colors} typography={typography} />
+              <InfoCell label="Precio unit." value={`$${mat.unitPrice}${mat.priceUnit ? "/" + mat.priceUnit : ""}`} colors={colors} typography={typography} />
               <InfoCell label="Proveedor" value={mat.supplier?.name?.split(" ")[0] ?? "—"} colors={colors} typography={typography} />
               <InfoCell label="Reorden" value={`${item.reorderPointDays}d`} colors={colors} typography={typography} />
             </View>
 
             <Pressable
               style={[styles.saveBtn, { backgroundColor: colors.gold }, saving && styles.saveBtnDisabled]}
-              onPress={() =>
-                onSave({
-                  currentStock: parseFloat(stock) || 0,
-                  dailyConsumption: parseFloat(consumption) || 0,
-                  notes: notes || undefined,
-                })
-              }
+              onPress={() => onSave({
+                currentStock: parseFloat(stock) || 0,
+                dailyConsumption: parseFloat(consumption) || 0,
+                notes: notes || undefined,
+              })}
               disabled={saving}
             >
-              {saving ? (
-                <ActivityIndicator color={colors.bg} size="small" />
-              ) : (
-                <Text style={[typography.h4, { color: colors.bg }]}>Guardar</Text>
-              )}
+              {saving
+                ? <ActivityIndicator color={colors.bg} size="small" />
+                : <Text style={[typography.h4, { color: colors.bg }]}>Guardar</Text>
+              }
             </Pressable>
           </ScrollView>
         </View>
@@ -204,32 +321,16 @@ function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
   );
 }
 
-function Field({
-  label, value, onChangeText, keyboardType, multiline, colors, typography,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (v: string) => void;
-  keyboardType?: "decimal-pad";
-  multiline?: boolean;
-  colors: Colors;
-  typography: any;
+function Field({ label, value, onChangeText, keyboardType, multiline, colors, typography }: {
+  label: string; value: string; onChangeText: (v: string) => void;
+  keyboardType?: "decimal-pad"; multiline?: boolean; colors: Colors; typography: any;
 }) {
   return (
     <View style={{ gap: spacing.xs }}>
       <Text style={typography.label}>{label}</Text>
       <TextInput
         style={[
-          {
-            backgroundColor: colors.card,
-            borderRadius: radius.md,
-            borderWidth: 1,
-            borderColor: colors.border,
-            paddingHorizontal: spacing.md,
-            paddingVertical: spacing.sm,
-            color: colors.textPrimary,
-            fontSize: 16,
-          },
+          { backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, color: colors.textPrimary, fontSize: 16 },
           multiline && { minHeight: 72, textAlignVertical: "top" as const, paddingTop: spacing.sm },
         ]}
         value={value}
@@ -251,7 +352,6 @@ function InfoCell({ label, value, colors, typography }: { label: string; value: 
     </View>
   );
 }
-
 const infoCellStyles = StyleSheet.create({
   cell: { flex: 1, borderRadius: radius.md, padding: spacing.sm, alignItems: "center", gap: 2, borderWidth: 1 },
 });
@@ -260,57 +360,42 @@ function makeStyles(colors: Colors) {
   return StyleSheet.create({
     container: { flex: 1 },
     loading: { flex: 1, alignItems: "center", justifyContent: "center" },
-    searchRow: { padding: spacing.md, paddingBottom: spacing.xs },
+    searchRow: {
+      flexDirection: "row", alignItems: "center",
+      padding: spacing.md, paddingBottom: spacing.xs, gap: spacing.xs,
+    },
     count: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
-
+    importBtn: {
+      width: 40, height: 40, borderRadius: radius.md, borderWidth: 1,
+      alignItems: "center", justifyContent: "center",
+    },
+    actionBtn: {
+      flexDirection: "row", alignItems: "center", gap: spacing.sm,
+      borderRadius: radius.md, paddingVertical: spacing.md, paddingHorizontal: spacing.md,
+      borderWidth: 1,
+    },
     overlay: { flex: 1, justifyContent: "flex-end" },
     backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)" },
     sheet: {
-      borderTopLeftRadius: radius.xl,
-      borderTopRightRadius: radius.xl,
-      maxHeight: "85%",
-      paddingBottom: spacing.xl,
+      borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
+      maxHeight: "85%", paddingBottom: spacing.xl,
     },
     handle: {
-      width: 40,
-      height: 4,
-      borderRadius: 2,
-      alignSelf: "center",
-      marginTop: spacing.sm,
-      marginBottom: spacing.md,
+      width: 40, height: 4, borderRadius: 2,
+      alignSelf: "center", marginTop: spacing.sm, marginBottom: spacing.md,
     },
     sheetHeader: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      paddingHorizontal: spacing.md,
-      paddingBottom: spacing.md,
-      gap: spacing.sm,
+      flexDirection: "row", alignItems: "flex-start",
+      paddingHorizontal: spacing.md, paddingBottom: spacing.md, gap: spacing.sm,
     },
-
     coveragePill: {
-      marginHorizontal: spacing.md,
-      marginBottom: spacing.sm,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-      borderRadius: radius.md,
-      borderWidth: 1,
+      marginHorizontal: spacing.md, marginBottom: spacing.sm,
+      paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+      borderRadius: radius.md, borderWidth: 1,
     },
-
     fieldGroup: { paddingHorizontal: spacing.md, gap: spacing.sm, marginBottom: spacing.md },
-
-    infoRow: {
-      flexDirection: "row",
-      paddingHorizontal: spacing.md,
-      marginBottom: spacing.md,
-      gap: spacing.sm,
-    },
-
-    saveBtn: {
-      marginHorizontal: spacing.md,
-      borderRadius: radius.md,
-      paddingVertical: spacing.md,
-      alignItems: "center",
-    },
+    infoRow: { flexDirection: "row", paddingHorizontal: spacing.md, marginBottom: spacing.md, gap: spacing.sm },
+    saveBtn: { marginHorizontal: spacing.md, borderRadius: radius.md, paddingVertical: spacing.md, alignItems: "center" },
     saveBtnDisabled: { opacity: 0.6 },
   });
 }

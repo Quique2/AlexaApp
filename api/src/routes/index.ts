@@ -9,6 +9,8 @@ import suppliersRouter from "./suppliers";
 import dashboardRouter from "./dashboard";
 import configRouter from "./config";
 import recipesRouter from "./recipes";
+import usersRouter from "./users";
+import adminRouter from "./admin";
 
 const router = Router();
 
@@ -22,5 +24,7 @@ router.use("/suppliers", suppliersRouter);
 router.use("/dashboard", dashboardRouter);
 router.use("/config", configRouter);
 router.use("/recipes", recipesRouter);
+router.use("/users", usersRouter);
+router.use("/admin", adminRouter);
 
 export default router;

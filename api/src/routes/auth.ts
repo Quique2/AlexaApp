@@ -4,12 +4,13 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "../lib/prisma";
 import { requireAuth, AuthRequest } from "../middleware/requireAuth";
+import { getClientIp } from "../middleware/requireActive";
 
 const router = Router();
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const ACCESS_TTL = "1h";
-const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 function signAccess(userId: string): string {
   return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: ACCESS_TTL });
@@ -23,13 +24,25 @@ async function createSession(userId: string) {
   const accessToken = signAccess(userId);
   const refreshToken = signRefresh(userId);
   await prisma.userSession.create({
-    data: {
-      userId,
-      refreshToken,
-      expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
-    },
+    data: { userId, refreshToken, expiresAt: new Date(Date.now() + REFRESH_TTL_MS) },
   });
   return { accessToken, refreshToken };
+}
+
+async function checkBlocks(req: Request, email: string): Promise<string | null> {
+  const emailBlocked = await prisma.blockedEntity.findUnique({
+    where: { type_value: { type: "EMAIL", value: email } },
+  });
+  if (emailBlocked) return "Acceso restringido";
+
+  const ip = getClientIp(req);
+  if (ip !== "unknown") {
+    const ipBlocked = await prisma.blockedEntity.findUnique({
+      where: { type_value: { type: "IP", value: ip } },
+    });
+    if (ipBlocked) return "Acceso restringido";
+  }
+  return null;
 }
 
 // ── Register ──────────────────────────────────────────────────────────────────
@@ -46,10 +59,11 @@ router.post("/register", async (req: Request, res: Response) => {
   }
   const { email, password, name } = parse.data;
 
+  const blocked = await checkBlocks(req, email);
+  if (blocked) return res.status(403).json({ error: blocked });
+
   const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return res.status(409).json({ error: "Este email ya está registrado" });
-  }
+  if (existing) return res.status(409).json({ error: "Este email ya está registrado" });
 
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await prisma.user.create({ data: { email, passwordHash, name } });
@@ -58,7 +72,7 @@ router.post("/register", async (req: Request, res: Response) => {
   res.status(201).json({
     accessToken,
     refreshToken,
-    user: { id: user.id, email: user.email, name: user.name },
+    user: { id: user.id, email: user.email, name: user.name, role: user.role },
   });
 });
 
@@ -75,30 +89,29 @@ router.post("/login", async (req: Request, res: Response) => {
   }
   const { email, password } = parse.data;
 
+  const blocked = await checkBlocks(req, email);
+  if (blocked) return res.status(403).json({ error: blocked });
+
   const user = await prisma.user.findUnique({ where: { email } });
-  // Use constant-time compare even on "not found" to prevent user enumeration
   const hash = user?.passwordHash ?? "$2a$12$invalidhashpadding000000000000000000000000000000000000000";
   const valid = await bcrypt.compare(password, hash);
 
-  if (!user || !valid) {
-    return res.status(401).json({ error: "Email o contraseña incorrectos" });
-  }
+  if (!user || !valid) return res.status(401).json({ error: "Email o contraseña incorrectos" });
+  if (!user.isActive) return res.status(403).json({ error: "Cuenta desactivada" });
 
   const { accessToken, refreshToken } = await createSession(user.id);
 
   res.json({
     accessToken,
     refreshToken,
-    user: { id: user.id, email: user.email, name: user.name },
+    user: { id: user.id, email: user.email, name: user.name, role: user.role },
   });
 });
 
 // ── Refresh ───────────────────────────────────────────────────────────────────
 router.post("/refresh", async (req: Request, res: Response) => {
   const { refreshToken } = req.body;
-  if (!refreshToken) {
-    return res.status(401).json({ error: "No refresh token provided" });
-  }
+  if (!refreshToken) return res.status(401).json({ error: "No refresh token provided" });
 
   let payload: { sub: string };
   try {
@@ -121,24 +134,18 @@ router.get("/me", requireAuth, async (req: Request, res: Response) => {
   const { userId } = req as AuthRequest;
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, name: true, createdAt: true },
+    select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
   });
   if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
   res.json(user);
 });
 
 // ── Biometric token ───────────────────────────────────────────────────────────
-// Creates a dedicated long-lived session for biometric re-auth.
-// Separate from the regular session so regular logout doesn't invalidate it.
 router.post("/biometric-token", requireAuth, async (req: Request, res: Response) => {
   const { userId } = req as AuthRequest;
   const refreshToken = signRefresh(userId);
   await prisma.userSession.create({
-    data: {
-      userId,
-      refreshToken,
-      expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
-    },
+    data: { userId, refreshToken, expiresAt: new Date(Date.now() + REFRESH_TTL_MS) },
   });
   res.json({ refreshToken });
 });

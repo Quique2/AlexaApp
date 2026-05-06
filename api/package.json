@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "db:push": "prisma db push",
     "db:seed": "ts-node prisma/seed.ts",
+    "db:seed-rbac": "ts-node prisma/seed-rbac.ts",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
@@ -22,6 +23,7 @@
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.3",
     "prisma": "^5.14.0",
+    "multer": "^1.4.5-lts.1",
     "xlsx": "^0.18.5",
     "zod": "^3.23.8"
   },
@@ -30,6 +32,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^1.4.11",
     "@types/node": "^20.14.2",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",

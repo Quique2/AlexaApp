@@ -19,6 +19,10 @@ export type ReceptionCondition =
   | "INCOMPLETE"
   | "EXPIRED";
 
+export type Role = "DEVELOPER" | "SUPERVISOR" | "OPERATOR" | "TRANSPORTER";
+export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type BlockType = "EMAIL" | "IP";
+
 export interface Supplier {
   id: string;
   name: string;
@@ -39,6 +43,7 @@ export interface Material {
   brand: string | null;
   unit: string;
   unitPrice: number;
+  priceUnit: string | null;
   supplierId: string | null;
   supplier?: Supplier | null;
   inventory?: InventoryRow | null;
@@ -71,6 +76,15 @@ export interface ProductionPlan {
   totalYeastG: number;
   notes: string | null;
   orderedAt: string | null;
+  approvalStatus: ApprovalStatus;
+  approvedById: string | null;
+  approvedAt: string | null;
+  rejectedById: string | null;
+  rejectedAt: string | null;
+  rejectionReason: string | null;
+  hasMissingPrices: boolean;
+  estimatedCost: number;
+  createdById: string | null;
   createdAt: string;
 }
 
@@ -146,4 +160,28 @@ export interface DashboardSummary {
   };
   monthlySpend: { total: number; orderCount: number };
   inTransitOrders: number;
+}
+
+export interface AppUser {
+  id: string;
+  email: string;
+  name: string | null;
+  role: Role;
+  isActive: boolean;
+  createdAt: string;
+  createdById: string | null;
+}
+
+export interface BlockedEntity {
+  id: string;
+  type: BlockType;
+  value: string;
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface ImportResult {
+  updated: number;
+  errors: { row: number; id: string; reason: string }[];
+  total: number;
 }

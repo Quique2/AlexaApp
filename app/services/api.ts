@@ -1,13 +1,17 @@
 import Constants from "expo-constants";
 import {
+  AppUser,
+  BlockedEntity,
   DashboardSummary,
   GenerateOrdersPreview,
+  ImportResult,
   InventoryRow,
   Material,
   Order,
   ProductionPlan,
   Reception,
   RecipeLine,
+  Role,
   Supplier,
 } from "../types";
 
@@ -16,14 +20,10 @@ const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ||
   "https://alexaapp-production.up.railway.app/api";
 
-// Token injected by AuthContext after login; lives only in memory
 let _accessToken: string | null = null;
 export const setApiToken = (token: string | null) => { _accessToken = token; };
 
-async function request<T>(
-  path: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = `${BASE_URL}${path}`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -38,8 +38,17 @@ async function request<T>(
   return res.json();
 }
 
+async function requestRaw(path: string, options: RequestInit = {}): Promise<Response> {
+  const url = `${BASE_URL}${path}`;
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string>),
+  };
+  if (_accessToken) headers["Authorization"] = `Bearer ${_accessToken}`;
+  return fetch(url, { ...options, headers });
+}
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
-export type AuthUser = { id: string; email: string; name?: string | null };
+export type AuthUser = { id: string; email: string; name?: string | null; role?: Role };
 export type AuthResponse = { accessToken: string; refreshToken: string; user: AuthUser };
 
 export const authApi = {
@@ -66,8 +75,6 @@ export const authApi = {
     }),
   createBiometricToken: () =>
     request<{ refreshToken: string }>("/auth/biometric-token", { method: "POST" }),
-  // Creates a fresh regular session (used after biometric login to get a REFRESH_KEY
-  // that is independent of the dedicated BIO_KEY, so logout doesn't kill biometrics)
   createSession: () =>
     request<{ refreshToken: string }>("/auth/biometric-token", { method: "POST" }),
 };
@@ -87,21 +94,26 @@ export const inventoryApi = {
     return request<InventoryRow[]>(`/inventory${qs ? `?${qs}` : ""}`);
   },
   alerts: () => request<InventoryRow[]>("/inventory/alerts"),
-  get: (materialId: string) =>
-    request<InventoryRow>(`/inventory/${materialId}`),
+  get: (materialId: string) => request<InventoryRow>(`/inventory/${materialId}`),
   update: (
     materialId: string,
-    data: Partial<{
-      currentStock: number;
-      dailyConsumption: number;
-      reorderPointDays: number;
-      notes: string;
-    }>
+    data: Partial<{ currentStock: number; dailyConsumption: number; reorderPointDays: number; notes: string }>
   ) =>
-    request<InventoryRow>(`/inventory/${materialId}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
+    request<InventoryRow>(`/inventory/${materialId}`, { method: "PUT", body: JSON.stringify(data) }),
+  downloadTemplate: async (): Promise<Blob> => {
+    const res = await requestRaw("/inventory/template");
+    if (!res.ok) throw new Error("Error descargando template");
+    return res.blob();
+  },
+  import: (file: File | { uri: string; name: string; type: string }): Promise<ImportResult> => {
+    const form = new FormData();
+    form.append("file", file as any);
+    return request<ImportResult>("/inventory/import", {
+      method: "POST",
+      body: form,
+      headers: {},
+    });
+  },
 };
 
 // ─── Materials ───────────────────────────────────────────────────────────────
@@ -117,8 +129,12 @@ export const materialsApi = {
     request<Material>("/materials", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Material>) =>
     request<Material>(`/materials/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  delete: (id: string) =>
-    request<void>(`/materials/${id}`, { method: "DELETE" }),
+  updatePrice: (id: string, unitPrice: number, priceUnit?: string) =>
+    request<Material>(`/materials/${id}/price`, {
+      method: "PUT",
+      body: JSON.stringify({ unitPrice, priceUnit }),
+    }),
+  delete: (id: string) => request<void>(`/materials/${id}`, { method: "DELETE" }),
 };
 
 // ─── Production ──────────────────────────────────────────────────────────────
@@ -129,14 +145,21 @@ export const productionApi = {
     ).toString();
     return request<ProductionPlan[]>(`/production${qs ? `?${qs}` : ""}`);
   },
+  pending: () => request<ProductionPlan[]>("/production/pending"),
   upcoming: () => request<ProductionPlan[]>("/production/upcoming"),
   get: (id: string) => request<ProductionPlan>(`/production/${id}`),
-  create: (data: Omit<ProductionPlan, "id" | "totalMaltKg" | "totalHopKg" | "totalYeastG" | "createdAt" | "updatedAt">) =>
+  create: (data: Omit<ProductionPlan, "id" | "totalMaltKg" | "totalHopKg" | "totalYeastG" | "approvalStatus" | "approvedById" | "approvedAt" | "rejectedById" | "rejectedAt" | "rejectionReason" | "hasMissingPrices" | "estimatedCost" | "createdById" | "createdAt" | "updatedAt">) =>
     request<ProductionPlan>("/production", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<ProductionPlan>) =>
     request<ProductionPlan>(`/production/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  delete: (id: string) =>
-    request<void>(`/production/${id}`, { method: "DELETE" }),
+  delete: (id: string) => request<void>(`/production/${id}`, { method: "DELETE" }),
+  approve: (id: string) =>
+    request<ProductionPlan>(`/production/${id}/approve`, { method: "POST" }),
+  reject: (id: string, reason?: string) =>
+    request<ProductionPlan>(`/production/${id}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
 };
 
 // ─── Orders ──────────────────────────────────────────────────────────────────
@@ -156,8 +179,7 @@ export const ordersApi = {
     request<Order>("/orders", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Order>) =>
     request<Order>(`/orders/${id}`, { method: "PUT", body: JSON.stringify(data) }),
-  delete: (id: string) =>
-    request<void>(`/orders/${id}`, { method: "DELETE" }),
+  delete: (id: string) => request<void>(`/orders/${id}`, { method: "DELETE" }),
 };
 
 // ─── Receptions ──────────────────────────────────────────────────────────────
@@ -190,4 +212,27 @@ export const suppliersApi = {
   get: (id: string) => request<Supplier>(`/suppliers/${id}`),
   update: (id: string, data: Partial<Supplier>) =>
     request<Supplier>(`/suppliers/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+};
+
+// ─── Users ───────────────────────────────────────────────────────────────────
+export const usersApi = {
+  list: () => request<AppUser[]>("/users"),
+  get: (id: string) => request<AppUser>(`/users/${id}`),
+  create: (data: { email: string; password: string; name?: string; role: Role }) =>
+    request<AppUser>("/users", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: { name?: string; role?: Role; isActive?: boolean }) =>
+    request<AppUser>(`/users/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  resetPassword: (id: string, password: string) =>
+    request<{ ok: boolean }>(`/users/${id}/reset-password`, {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    }),
+};
+
+// ─── Admin ───────────────────────────────────────────────────────────────────
+export const adminApi = {
+  listBlocked: () => request<BlockedEntity[]>("/admin/blocked"),
+  block: (data: { type: "EMAIL" | "IP"; value: string; reason?: string }) =>
+    request<BlockedEntity>("/admin/blocked", { method: "POST", body: JSON.stringify(data) }),
+  unblock: (id: string) => request<void>(`/admin/blocked/${id}`, { method: "DELETE" }),
 };

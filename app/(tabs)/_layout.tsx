@@ -4,6 +4,7 @@ import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { SettingsModal } from "../components/SettingsModal";
+import { useAuth } from "../context/AuthContext";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -37,6 +38,10 @@ function HeaderRight() {
 
 export default function TabLayout() {
   const { colors } = useTheme();
+  const { hasRole } = useAuth();
+
+  const canSeeRecipes = hasRole(["DEVELOPER", "SUPERVISOR", "OPERATOR"]);
+  const canSeeUsers = hasRole(["DEVELOPER", "SUPERVISOR"]);
 
   return (
     <Tabs
@@ -96,6 +101,26 @@ export default function TabLayout() {
           title: "Pedidos",
           tabBarIcon: ({ focused, color }) => (
             <TabIcon name="receipt" focused={focused} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="recipes"
+        options={{
+          title: "Recetas",
+          href: canSeeRecipes ? undefined : null,
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name="book" focused={focused} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="users"
+        options={{
+          title: "Usuarios",
+          href: canSeeUsers ? undefined : null,
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon name="people" focused={focused} color={color} />
           ),
         }}
       />
