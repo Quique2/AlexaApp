@@ -14,7 +14,7 @@ import { InventoryRow } from "../components/InventoryRow";
 import { AlertBadge } from "../components/AlertBadge";
 import { EmptyState } from "../components/EmptyState";
 import { useInventory, useUpdateInventory } from "../hooks/useInventory";
-import { inventoryApi } from "../services/api";
+import { inventoryApi, materialsApi } from "../services/api";
 import type { InventoryRow as IRow } from "../types";
 
 const ALERT_FILTERS = [
@@ -253,15 +253,45 @@ interface EditModalProps {
 function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
   const { colors, typography } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { hasRole } = useAuth();
+  const canEditPrices = hasRole(["DEVELOPER", "SUPERVISOR"]);
   const mat = item.material!;
   const [stock, setStock] = useState(String(item.currentStock));
   const [consumption, setConsumption] = useState(String(item.dailyConsumption));
   const [notes, setNotes] = useState(item.notes ?? "");
+  const [priceInput, setPriceInput] = useState(mat.unitPrice != null ? String(mat.unitPrice) : "");
+  const [priceUnitInput, setPriceUnitInput] = useState(mat.priceUnit ?? "");
+  const [savingPrice, setSavingPrice] = useState(false);
 
   const coverage =
     parseFloat(consumption) > 0
       ? Math.round(parseFloat(stock) / parseFloat(consumption))
       : null;
+
+  const handleSave = async () => {
+    if (canEditPrices) {
+      const newPrice = parseFloat(priceInput);
+      const priceChanged = !isNaN(newPrice) && (newPrice !== mat.unitPrice || priceUnitInput !== (mat.priceUnit ?? ""));
+      if (priceChanged) {
+        setSavingPrice(true);
+        try {
+          await materialsApi.updatePrice(mat.id, newPrice, priceUnitInput || undefined);
+        } catch (e: any) {
+          Alert.alert("Error al guardar precio", e.message);
+          setSavingPrice(false);
+          return;
+        }
+        setSavingPrice(false);
+      }
+    }
+    onSave({
+      currentStock: parseFloat(stock) || 0,
+      dailyConsumption: parseFloat(consumption) || 0,
+      notes: notes || undefined,
+    });
+  };
+
+  const isSaving = saving || savingPrice;
 
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose}>
@@ -292,24 +322,34 @@ function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
               <Field label={`Stock actual (${mat.unit})`} value={stock} onChangeText={setStock} keyboardType="decimal-pad" colors={colors} typography={typography} />
               <Field label={`Consumo diario planado (${mat.unit}/día)`} value={consumption} onChangeText={setConsumption} keyboardType="decimal-pad" colors={colors} typography={typography} />
               <Field label="Notas / condición" value={notes} onChangeText={setNotes} multiline colors={colors} typography={typography} />
+              {canEditPrices && (
+                <>
+                  <Field label="Precio unitario ($)" value={priceInput} onChangeText={setPriceInput} keyboardType="decimal-pad" colors={colors} typography={typography} />
+                  <Field label="Unidad de precio (ej: kg, L, unidad)" value={priceUnitInput} onChangeText={setPriceUnitInput} colors={colors} typography={typography} />
+                </>
+              )}
             </View>
 
-            <View style={styles.infoRow}>
-              <InfoCell label="Precio unit." value={`$${mat.unitPrice}${mat.priceUnit ? "/" + mat.priceUnit : ""}`} colors={colors} typography={typography} />
-              <InfoCell label="Proveedor" value={mat.supplier?.name?.split(" ")[0] ?? "—"} colors={colors} typography={typography} />
-              <InfoCell label="Reorden" value={`${item.reorderPointDays}d`} colors={colors} typography={typography} />
-            </View>
+            {!canEditPrices && (
+              <View style={styles.infoRow}>
+                <InfoCell label="Precio unit." value={mat.unitPrice != null ? `$${mat.unitPrice}${mat.priceUnit ? "/" + mat.priceUnit : ""}` : "—"} colors={colors} typography={typography} />
+                <InfoCell label="Proveedor" value={mat.supplier?.name?.split(" ")[0] ?? "—"} colors={colors} typography={typography} />
+                <InfoCell label="Reorden" value={`${item.reorderPointDays}d`} colors={colors} typography={typography} />
+              </View>
+            )}
+            {canEditPrices && (
+              <View style={styles.infoRow}>
+                <InfoCell label="Proveedor" value={mat.supplier?.name?.split(" ")[0] ?? "—"} colors={colors} typography={typography} />
+                <InfoCell label="Reorden" value={`${item.reorderPointDays}d`} colors={colors} typography={typography} />
+              </View>
+            )}
 
             <Pressable
-              style={[styles.saveBtn, { backgroundColor: colors.gold }, saving && styles.saveBtnDisabled]}
-              onPress={() => onSave({
-                currentStock: parseFloat(stock) || 0,
-                dailyConsumption: parseFloat(consumption) || 0,
-                notes: notes || undefined,
-              })}
-              disabled={saving}
+              style={[styles.saveBtn, { backgroundColor: colors.gold }, isSaving && styles.saveBtnDisabled]}
+              onPress={handleSave}
+              disabled={isSaving}
             >
-              {saving
+              {isSaving
                 ? <ActivityIndicator color={colors.bg} size="small" />
                 : <Text style={[typography.h4, { color: colors.bg }]}>Guardar</Text>
               }

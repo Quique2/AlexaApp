@@ -16,6 +16,14 @@ import type { RecipeLine, Material } from "../types";
 
 const STYLES = ["Löndon", "Whïte", "Kölsh", "Mëxican IPA", "Monterrëy Stout", "Edición especial"];
 
+const MATERIAL_TYPE_LABELS: Record<string, string> = {
+  LUPULO: "Lúpulo",
+  MALTA: "Malta",
+  YEAST: "Levadura",
+  ADJUNTO: "Adjunto",
+  OTRO: "Otro",
+};
+
 const STYLE_EMOJIS: Record<string, string> = {
   "Löndon": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
   "Whïte": "🌾",
@@ -155,7 +163,8 @@ function RecipeLineRow({
           {line.material?.name ?? line.materialId}
         </Text>
         <Text style={typography.caption}>
-          {line.material?.type} · {line.material?.brand ?? "—"}
+          {MATERIAL_TYPE_LABELS[line.material?.type ?? ""] ?? line.material?.type}
+          {line.material?.brand ? ` · ${line.material.brand}` : ""}
         </Text>
         {line.notes ? <Text style={[typography.caption, { color: colors.textSecondary }]}>{line.notes}</Text> : null}
       </View>
@@ -326,7 +335,7 @@ function AddLineModal({
                     >
                       <View style={{ flex: 1 }}>
                         <Text style={[typography.h4, { fontSize: 14 }]}>{item.name}</Text>
-                        <Text style={typography.caption}>{item.type} · {item.unit}</Text>
+                        <Text style={typography.caption}>{MATERIAL_TYPE_LABELS[item.type] ?? item.type} · {item.unit}</Text>
                       </View>
                       <Ionicons name="add-circle-outline" size={20} color={colors.gold} />
                     </Pressable>

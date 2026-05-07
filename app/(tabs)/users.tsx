@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
 import {
-  View, FlatList, Text, StyleSheet, Pressable, Modal,
+  View, Text, StyleSheet, Pressable, Modal,
   ScrollView, TextInput, ActivityIndicator, RefreshControl, Alert,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, SectionList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { spacing, radius, Colors } from "../constants/theme";
@@ -11,7 +11,9 @@ import { useAuth } from "../context/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { SectionHeader } from "../components/SectionHeader";
 import { useUsers, useCreateUser, useUpdateUser, useResetPassword } from "../hooks/useUsers";
-import type { AppUser, Role } from "../types";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { adminApi } from "../services/api";
+import type { AppUser, Role, BlockedEntity } from "../types";
 
 const ROLE_LABELS: Record<Role, string> = {
   DEVELOPER: "Developer",
@@ -34,13 +36,28 @@ export default function UsersScreen() {
   const { colors, typography } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { hasRole } = useAuth();
+  const queryClient = useQueryClient();
 
+  const isDeveloper = hasRole(["DEVELOPER"]);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<AppUser | null>(null);
   const [resetting, setResetting] = useState<AppUser | null>(null);
+  const [showAddBlock, setShowAddBlock] = useState(false);
 
   const { data: users, isLoading, refetch, isRefetching } = useUsers();
   const updateMutation = useUpdateUser();
+
+  const { data: blocked, refetch: refetchBlocked, isRefetching: isRefetchingBlocked } = useQuery({
+    queryKey: ["blocked"],
+    queryFn: adminApi.listBlocked,
+    enabled: isDeveloper,
+  });
+
+  const unblockMutation = useMutation({
+    mutationFn: (id: string) => adminApi.unblock(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["blocked"] }),
+    onError: (e: any) => Alert.alert("Error", e.message),
+  });
 
   const handleToggleActive = (user: AppUser) => {
     Alert.alert(
@@ -57,33 +74,76 @@ export default function UsersScreen() {
     );
   };
 
-  const roleOptions = hasRole(["DEVELOPER"]) ? ALL_ROLES : ASSIGNABLE_ROLES;
+  const handleUnblock = (entity: BlockedEntity) => {
+    Alert.alert(
+      "Quitar bloqueo",
+      `¿Desbloquear ${entity.type === "EMAIL" ? "correo" : "IP"} "${entity.value}"?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Desbloquear", style: "destructive", onPress: () => unblockMutation.mutate(entity.id) },
+      ]
+    );
+  };
+
+  const roleOptions = isDeveloper ? ALL_ROLES : ASSIGNABLE_ROLES;
+
+  const sections = useMemo(() => {
+    const result: { title: string; data: any[]; type: "users" | "blocked" }[] = [
+      { title: "EQUIPO", data: users ?? [], type: "users" },
+    ];
+    if (isDeveloper) {
+      result.push({ title: "BLOQUEADOS", data: blocked ?? [], type: "blocked" });
+    }
+    return result;
+  }, [users, blocked, isDeveloper]);
+
+  if (isLoading) {
+    return <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xl }} />;
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      {isLoading ? (
-        <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xl }} />
-      ) : (
-        <FlatList
-          data={users}
-          keyExtractor={(u) => u.id}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.gold} />}
-          ListHeaderComponent={() => <SectionHeader title="EQUIPO" />}
-          renderItem={({ item }) => (
-            <UserRow
-              user={item}
+      <SectionList
+        sections={sections}
+        keyExtractor={(item, index) => item.id ?? String(index)}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching || isRefetchingBlocked}
+            onRefresh={() => { refetch(); if (isDeveloper) refetchBlocked(); }}
+            tintColor={colors.gold}
+          />
+        }
+        renderSectionHeader={({ section }) => <SectionHeader title={section.title} />}
+        renderItem={({ item, section }) => {
+          if (section.type === "users") {
+            return (
+              <UserRow
+                user={item}
+                colors={colors}
+                typography={typography}
+                onEdit={() => setEditing(item)}
+                onResetPassword={() => setResetting(item)}
+                onToggleActive={() => handleToggleActive(item)}
+              />
+            );
+          }
+          return (
+            <BlockedRow
+              entity={item}
               colors={colors}
               typography={typography}
-              onEdit={() => setEditing(item)}
-              onResetPassword={() => setResetting(item)}
-              onToggleActive={() => handleToggleActive(item)}
+              onUnblock={() => handleUnblock(item)}
             />
-          )}
-          ListEmptyComponent={
-            <EmptyState icon="👥" title="Sin usuarios" subtitle="Crea el primer usuario del equipo" />
-          }
-        />
-      )}
+          );
+        }}
+        renderSectionFooter={({ section }) =>
+          section.data.length === 0 ? (
+            section.type === "users"
+              ? <EmptyState icon="👥" title="Sin usuarios" subtitle="Crea el primer usuario del equipo" />
+              : <EmptyState icon="🚫" title="Sin bloqueos" subtitle="No hay emails ni IPs bloqueados" />
+          ) : null
+        }
+      />
 
       <Pressable
         style={[styles.fab, { backgroundColor: colors.gold, shadowColor: colors.gold }]}
@@ -91,6 +151,15 @@ export default function UsersScreen() {
       >
         <Ionicons name="add" size={26} color={colors.bg} />
       </Pressable>
+
+      {isDeveloper && (
+        <Pressable
+          style={[styles.fabSecondary, { backgroundColor: colors.surface, borderColor: colors.border, shadowColor: "#000" }]}
+          onPress={() => setShowAddBlock(true)}
+        >
+          <Ionicons name="ban-outline" size={22} color={colors.textSecondary} />
+        </Pressable>
+      )}
 
       {showCreate && (
         <CreateUserModal
@@ -110,6 +179,9 @@ export default function UsersScreen() {
           user={resetting}
           onClose={() => setResetting(null)}
         />
+      )}
+      {showAddBlock && (
+        <AddBlockModal onClose={() => setShowAddBlock(false)} />
       )}
     </View>
   );
@@ -155,6 +227,31 @@ function UserRow({
           />
         </Pressable>
       </View>
+    </View>
+  );
+}
+
+function BlockedRow({
+  entity, colors, typography, onUnblock,
+}: {
+  entity: BlockedEntity;
+  colors: Colors;
+  typography: any;
+  onUnblock: () => void;
+}) {
+  const isEmail = entity.type === "EMAIL";
+  return (
+    <View style={[rowStyles.row, { borderBottomColor: colors.border }]}>
+      <View style={[rowStyles.avatar, { backgroundColor: colors.redBg }]}>
+        <Ionicons name={isEmail ? "mail-outline" : "globe-outline"} size={16} color={colors.red} />
+      </View>
+      <View style={rowStyles.info}>
+        <Text style={[typography.h4, { fontSize: 14 }]}>{entity.value}</Text>
+        <Text style={typography.caption}>{isEmail ? "Email" : "IP"}{entity.reason ? ` · ${entity.reason}` : ""}</Text>
+      </View>
+      <Pressable onPress={onUnblock} hitSlop={8}>
+        <Ionicons name="close-circle-outline" size={20} color={colors.red} />
+      </Pressable>
     </View>
   );
 }
@@ -383,13 +480,100 @@ function ResetPasswordModal({ user, onClose }: { user: AppUser; onClose: () => v
   );
 }
 
+function AddBlockModal({ onClose }: { onClose: () => void }) {
+  const { colors, typography } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const queryClient = useQueryClient();
+
+  const [type, setType] = useState<"EMAIL" | "IP">("EMAIL");
+  const [value, setValue] = useState("");
+  const [reason, setReason] = useState("");
+
+  const blockMutation = useMutation({
+    mutationFn: () => adminApi.block({ type, value: value.trim(), reason: reason.trim() || undefined }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["blocked"] });
+      onClose();
+    },
+    onError: (e: any) => Alert.alert("Error", e.message),
+  });
+
+  const handleSave = () => {
+    if (!value.trim()) return Alert.alert("Error", "Ingresa un valor para bloquear");
+    blockMutation.mutate();
+  };
+
+  return (
+    <Modal transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.overlay}>
+        <Pressable style={styles.backdrop} onPress={onClose} />
+        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
+          <View style={styles.sheetHeader}>
+            <Text style={typography.h3}>Bloquear email o IP</Text>
+            <Pressable onPress={onClose} hitSlop={8}>
+              <Ionicons name="close" size={22} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={styles.formContent}>
+            <Text style={[typography.label, { marginBottom: spacing.xs }]}>TIPO</Text>
+            <View style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md }}>
+              {(["EMAIL", "IP"] as const).map((t) => (
+                <Pressable
+                  key={t}
+                  style={[
+                    styles.roleChip,
+                    { borderColor: colors.border, backgroundColor: colors.card },
+                    t === type && { borderColor: colors.red },
+                  ]}
+                  onPress={() => setType(t)}
+                >
+                  <Text style={[typography.bodySmall, { color: t === type ? (colors.red) : colors.textSecondary }]}>
+                    {t === "EMAIL" ? "Correo" : "IP"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <FormField
+              label={type === "EMAIL" ? "Correo electrónico" : "Dirección IP"}
+              value={value}
+              onChangeText={setValue}
+              keyboardType={type === "EMAIL" ? "email-address" : undefined}
+              autoCapitalize="none"
+              colors={colors}
+              typography={typography}
+            />
+            <FormField
+              label="Motivo (opcional)"
+              value={reason}
+              onChangeText={setReason}
+              colors={colors}
+              typography={typography}
+            />
+            <Pressable
+              style={[styles.saveBtn, { backgroundColor: colors.red }, blockMutation.isPending && { opacity: 0.6 }]}
+              onPress={handleSave}
+              disabled={blockMutation.isPending}
+            >
+              {blockMutation.isPending
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={[typography.h4, { color: "#fff" }]}>Bloquear</Text>
+              }
+            </Pressable>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 function FormField({
   label, value, onChangeText, keyboardType, autoCapitalize, secureTextEntry, colors, typography,
 }: {
   label: string;
   value: string;
   onChangeText: (v: string) => void;
-  keyboardType?: "email-address";
+  keyboardType?: "email-address" | "default";
   autoCapitalize?: "none";
   secureTextEntry?: boolean;
   colors: Colors;
@@ -431,6 +615,16 @@ function makeStyles(colors: Colors) {
       alignItems: "center", justifyContent: "center",
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.4, shadowRadius: 8, elevation: 8,
+    },
+    fabSecondary: {
+      position: "absolute",
+      bottom: spacing.xl + 64,
+      right: spacing.md,
+      width: 46, height: 46, borderRadius: 23,
+      alignItems: "center", justifyContent: "center",
+      borderWidth: 1,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2, shadowRadius: 4, elevation: 4,
     },
     overlay: { flex: 1, justifyContent: "flex-end" },
     backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)" },
