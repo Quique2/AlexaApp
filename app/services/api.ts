@@ -193,6 +193,7 @@ export const receptionsApi = {
 
 // ─── Recipes ─────────────────────────────────────────────────────────────────
 export const recipesApi = {
+  styles: () => request<string[]>("/recipes/styles"),
   list: (style?: string) =>
     request<RecipeLine[]>(`/recipes${style ? `?style=${encodeURIComponent(style)}` : ""}`),
   create: (data: { beerStyle: string; materialId: string; qtyPerBatch: number; notes?: string }) =>

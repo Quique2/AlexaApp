@@ -5,6 +5,7 @@ import {
   RefreshControl, Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { spacing, radius, Colors } from "../constants/theme";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
@@ -15,7 +16,7 @@ import { AlertBadge } from "../components/AlertBadge";
 import { EmptyState } from "../components/EmptyState";
 import { useInventory, useUpdateInventory } from "../hooks/useInventory";
 import { inventoryApi, materialsApi } from "../services/api";
-import type { InventoryRow as IRow } from "../types";
+import type { InventoryRow as IRow, MaterialType } from "../types";
 
 const ALERT_FILTERS = [
   { label: "Todos", value: "" },
@@ -37,13 +38,33 @@ export default function InventoryScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { hasRole } = useAuth();
 
-  const canImport = hasRole(["DEVELOPER", "SUPERVISOR"]);
+  const canManage = hasRole(["DEVELOPER", "SUPERVISOR"]);
 
   const [search, setSearch] = useState("");
   const [alertFilter, setAlertFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [selected, setSelected] = useState<IRow | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
+
+  const handleDownloadTemplate = async () => {
+    if (Platform.OS !== "web") {
+      Alert.alert("Plantilla", "Descarga disponible solo en web.");
+      return;
+    }
+    try {
+      const blob = await inventoryApi.downloadTemplate();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "inventario_template.xlsx";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      Alert.alert("Error", e.message);
+    }
+  };
 
   const params = useMemo(
     () => ({ alert: alertFilter || undefined, type: typeFilter || undefined }),
@@ -72,17 +93,7 @@ export default function InventoryScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <View style={styles.searchRow}>
-        <View style={{ flex: 1 }}>
-          <SearchBar value={search} onChangeText={setSearch} placeholder="Buscar material..." />
-        </View>
-        {canImport && (
-          <Pressable
-            style={[styles.importBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            onPress={() => setShowImportModal(true)}
-          >
-            <Ionicons name="cloud-upload-outline" size={18} color={colors.textSecondary} />
-          </Pressable>
-        )}
+        <SearchBar value={search} onChangeText={setSearch} placeholder="Buscar material..." />
       </View>
 
       <FilterChips chips={ALERT_FILTERS} selected={alertFilter} onSelect={setAlertFilter} />
@@ -118,6 +129,48 @@ export default function InventoryScreen() {
       {showImportModal && (
         <ImportModal onClose={() => { setShowImportModal(false); refetch(); }} />
       )}
+      {showCreate && (
+        <CreateMaterialModal onClose={() => { setShowCreate(false); refetch(); }} />
+      )}
+
+      {canManage && (
+        <>
+          {fabOpen && (
+            <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setFabOpen(false)} />
+          )}
+          {fabOpen && (
+            <View style={styles.miniFabs}>
+              <MiniFabRow
+                label="Añadir nuevo ingrediente"
+                icon="leaf-outline"
+                onPress={() => { setFabOpen(false); setShowCreate(true); }}
+                colors={colors}
+                typography={typography}
+              />
+              <MiniFabRow
+                label="Descargar plantilla"
+                icon="download-outline"
+                onPress={() => { setFabOpen(false); handleDownloadTemplate(); }}
+                colors={colors}
+                typography={typography}
+              />
+              <MiniFabRow
+                label="Subir archivo"
+                icon="cloud-upload-outline"
+                onPress={() => { setFabOpen(false); setShowImportModal(true); }}
+                colors={colors}
+                typography={typography}
+              />
+            </View>
+          )}
+          <Pressable
+            style={[styles.fab, { backgroundColor: colors.gold, shadowColor: colors.gold }]}
+            onPress={() => setFabOpen((o) => !o)}
+          >
+            <Ionicons name={fabOpen ? "close" : "add"} size={26} color={colors.bg} />
+          </Pressable>
+        </>
+      )}
     </View>
   );
 }
@@ -125,30 +178,8 @@ export default function InventoryScreen() {
 function ImportModal({ onClose }: { onClose: () => void }) {
   const { colors, typography } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [downloading, setDownloading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<{ updated: number; errors: any[]; total: number } | null>(null);
-
-  const handleDownloadTemplate = async () => {
-    setDownloading(true);
-    try {
-      if (Platform.OS === "web") {
-        const blob = await inventoryApi.downloadTemplate();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "inventario_template.xlsx";
-        a.click();
-        URL.revokeObjectURL(url);
-      } else {
-        Alert.alert("Template", "Descarga disponible solo en web. Usa el navegador para descargar.");
-      }
-    } catch (e: any) {
-      Alert.alert("Error", e.message);
-    } finally {
-      setDownloading(false);
-    }
-  };
 
   const handleImport = async () => {
     if (Platform.OS === "web") {
@@ -181,7 +212,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
         <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
           <View style={[styles.handle, { backgroundColor: colors.border }]} />
           <View style={styles.sheetHeader}>
-            <Text style={typography.h3}>Importar inventario Excel</Text>
+            <Text style={typography.h3}>Subir archivo Excel</Text>
             <Pressable onPress={onClose} hitSlop={8}>
               <Ionicons name="close" size={22} color={colors.textSecondary} />
             </Pressable>
@@ -189,23 +220,8 @@ function ImportModal({ onClose }: { onClose: () => void }) {
 
           <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md }}>
             <Text style={[typography.bodySmall, { color: colors.textSecondary }]}>
-              Descarga la plantilla, edita el stock y consumo diario, y luego importa el archivo.
-              Los materiales se identifican por su columna "id".
+              Selecciona el archivo Excel con el inventario. Los materiales se identifican por su columna "id".
             </Text>
-
-            <Pressable
-              style={[styles.actionBtn, { backgroundColor: colors.card, borderColor: colors.border }, downloading && { opacity: 0.6 }]}
-              onPress={handleDownloadTemplate}
-              disabled={downloading}
-            >
-              {downloading
-                ? <ActivityIndicator color={colors.gold} size="small" />
-                : <Ionicons name="download-outline" size={18} color={colors.gold} />
-              }
-              <Text style={[typography.h4, { color: colors.gold }]}>
-                {downloading ? "Descargando..." : "Descargar plantilla"}
-              </Text>
-            </Pressable>
 
             <Pressable
               style={[styles.actionBtn, { backgroundColor: colors.gold }, importing && { opacity: 0.6 }]}
@@ -223,9 +239,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
 
             {result && (
               <View style={[{ padding: spacing.md, borderRadius: radius.md, borderWidth: 1 }, { backgroundColor: colors.greenBg, borderColor: colors.green }]}>
-                <Text style={[typography.h4, { color: colors.green }]}>
-                  Importación completada
-                </Text>
+                <Text style={[typography.h4, { color: colors.green }]}>Importación completada</Text>
                 <Text style={[typography.bodySmall, { color: colors.green, marginTop: 4 }]}>
                   {result.updated} de {result.total} filas actualizadas
                 </Text>
@@ -396,18 +410,159 @@ const infoCellStyles = StyleSheet.create({
   cell: { flex: 1, borderRadius: radius.md, padding: spacing.sm, alignItems: "center", gap: 2, borderWidth: 1 },
 });
 
+const MATERIAL_TYPE_LABELS: Record<string, string> = {
+  LUPULO: "Lúpulo", MALTA: "Malta", YEAST: "Levadura", ADJUNTO: "Adjunto", OTRO: "Otro",
+};
+const MATERIAL_TYPES: MaterialType[] = ["LUPULO", "MALTA", "YEAST", "ADJUNTO", "OTRO"];
+
+function MiniFabRow({
+  label, icon, onPress, colors, typography,
+}: {
+  label: string; icon: string; onPress: () => void; colors: Colors; typography: any;
+}) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+      <View style={{
+        paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
+        borderRadius: radius.md, backgroundColor: colors.surface,
+        borderWidth: 1, borderColor: colors.border,
+        shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.15, shadowRadius: 2, elevation: 2,
+      }}>
+        <Text style={[typography.bodySmall, { color: colors.textPrimary }]}>{label}</Text>
+      </View>
+      <Pressable
+        style={{
+          width: 40, height: 40, borderRadius: 20,
+          backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+          alignItems: "center", justifyContent: "center",
+          shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.15, shadowRadius: 2, elevation: 2,
+        }}
+        onPress={onPress}
+        hitSlop={4}
+      >
+        <Ionicons name={icon as any} size={18} color={colors.textSecondary} />
+      </Pressable>
+    </View>
+  );
+}
+
+function CreateMaterialModal({ onClose }: { onClose: () => void }) {
+  const { colors, typography } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const qc = useQueryClient();
+
+  const [name, setName] = useState("");
+  const [type, setType] = useState<MaterialType>("OTRO");
+  const [unit, setUnit] = useState("");
+  const [brand, setBrand] = useState("");
+  const [price, setPrice] = useState("");
+  const [priceUnitVal, setPriceUnitVal] = useState("");
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      materialsApi.create({
+        id: `mat_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+        name: name.trim(),
+        type,
+        unit: unit.trim(),
+        brand: brand.trim() || null,
+        unitPrice: parseFloat(price) || 0,
+        priceUnit: priceUnitVal.trim() || null,
+        supplierId: null,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+      qc.invalidateQueries({ queryKey: ["materials"] });
+      onClose();
+    },
+    onError: (e: any) => Alert.alert("Error", e.message),
+  });
+
+  const handleSave = () => {
+    if (!name.trim()) return Alert.alert("Error", "El nombre es obligatorio");
+    if (!unit.trim()) return Alert.alert("Error", "La unidad es obligatoria (ej: kg, L)");
+    createMutation.mutate();
+  };
+
+  return (
+    <Modal transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.overlay}>
+        <Pressable style={styles.backdrop} onPress={onClose} />
+        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
+          <View style={styles.sheetHeader}>
+            <Text style={typography.h3}>Nuevo ingrediente</Text>
+            <Pressable onPress={onClose} hitSlop={8}>
+              <Ionicons name="close" size={22} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: spacing.xxl, gap: spacing.sm }}>
+            <Field label="Nombre *" value={name} onChangeText={setName} colors={colors} typography={typography} />
+
+            <View style={{ gap: spacing.xs }}>
+              <Text style={typography.label}>TIPO *</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }}>
+                {MATERIAL_TYPES.map((t) => (
+                  <Pressable
+                    key={t}
+                    style={[
+                      { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.full, borderWidth: 1 },
+                      t === type
+                        ? { borderColor: colors.gold, backgroundColor: colors.goldDim + "22" }
+                        : { borderColor: colors.border, backgroundColor: colors.card },
+                    ]}
+                    onPress={() => setType(t)}
+                  >
+                    <Text style={[typography.bodySmall, { color: t === type ? colors.gold : colors.textSecondary }]}>
+                      {MATERIAL_TYPE_LABELS[t]}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            <Field label="Unidad (ej: kg, L, g, unidad) *" value={unit} onChangeText={setUnit} colors={colors} typography={typography} />
+            <Field label="Marca (opcional)" value={brand} onChangeText={setBrand} colors={colors} typography={typography} />
+            <Field label="Precio unitario ($)" value={price} onChangeText={setPrice} keyboardType="decimal-pad" colors={colors} typography={typography} />
+            <Field label="Unidad de precio (ej: kg, L)" value={priceUnitVal} onChangeText={setPriceUnitVal} colors={colors} typography={typography} />
+
+            <Pressable
+              style={[styles.saveBtn, { backgroundColor: colors.gold }, createMutation.isPending && styles.saveBtnDisabled]}
+              onPress={handleSave}
+              disabled={createMutation.isPending}
+            >
+              {createMutation.isPending
+                ? <ActivityIndicator color={colors.bg} size="small" />
+                : <Text style={[typography.h4, { color: colors.bg }]}>Crear ingrediente</Text>
+              }
+            </Pressable>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 function makeStyles(colors: Colors) {
   return StyleSheet.create({
     container: { flex: 1 },
     loading: { flex: 1, alignItems: "center", justifyContent: "center" },
     searchRow: {
-      flexDirection: "row", alignItems: "center",
-      padding: spacing.md, paddingBottom: spacing.xs, gap: spacing.xs,
+      padding: spacing.md, paddingBottom: spacing.xs,
     },
     count: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs },
-    importBtn: {
-      width: 40, height: 40, borderRadius: radius.md, borderWidth: 1,
+    fab: {
+      position: "absolute", bottom: spacing.xl, right: spacing.md,
+      width: 56, height: 56, borderRadius: 28,
       alignItems: "center", justifyContent: "center",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.4, shadowRadius: 8, elevation: 8,
+    },
+    miniFabs: {
+      position: "absolute", bottom: spacing.xl + 68, right: spacing.md,
+      gap: spacing.sm, alignItems: "flex-end",
     },
     actionBtn: {
       flexDirection: "row", alignItems: "center", gap: spacing.sm,

@@ -14,7 +14,7 @@ import { SectionHeader } from "../components/SectionHeader";
 import { recipesApi, materialsApi } from "../services/api";
 import type { RecipeLine, Material } from "../types";
 
-const STYLES = ["Löndon", "Whïte", "Kölsh", "Mëxican IPA", "Monterrëy Stout", "Edición especial"];
+const BASE_STYLES = ["Löndon", "Whïte", "Kölsh", "Mëxican IPA", "Monterrëy Stout", "Edición especial"];
 
 const MATERIAL_TYPE_LABELS: Record<string, string> = {
   LUPULO: "Lúpulo",
@@ -40,9 +40,22 @@ export default function RecipesScreen() {
   const qc = useQueryClient();
 
   const canEdit = hasRole(["DEVELOPER", "SUPERVISOR"]);
-  const [selectedStyle, setSelectedStyle] = useState(STYLES[0]);
+  const [localStyles, setLocalStyles] = useState<string[]>([]);
+  const [selectedStyle, setSelectedStyle] = useState(BASE_STYLES[0]);
   const [showAdd, setShowAdd] = useState(false);
+  const [showCreateStyle, setShowCreateStyle] = useState(false);
   const [editing, setEditing] = useState<RecipeLine | null>(null);
+  const [fabOpen, setFabOpen] = useState(false);
+
+  const { data: remoteStyles } = useQuery({
+    queryKey: ["recipes-styles"],
+    queryFn: () => recipesApi.styles(),
+  });
+
+  const allStyles = useMemo(() => {
+    const set = new Set([...BASE_STYLES, ...(remoteStyles ?? []), ...localStyles]);
+    return Array.from(set);
+  }, [remoteStyles, localStyles]);
 
   const { data: lines, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["recipes", selectedStyle],
@@ -69,7 +82,7 @@ export default function RecipesScreen() {
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.styleScroll}>
         <View style={{ flexDirection: "row", gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
-          {STYLES.map((s) => (
+          {allStyles.map((s) => (
             <Pressable
               key={s}
               style={[
@@ -121,12 +134,35 @@ export default function RecipesScreen() {
       )}
 
       {canEdit && (
-        <Pressable
-          style={[styles.fab, { backgroundColor: colors.gold, shadowColor: colors.gold }]}
-          onPress={() => setShowAdd(true)}
-        >
-          <Ionicons name="add" size={26} color={colors.bg} />
-        </Pressable>
+        <>
+          {fabOpen && (
+            <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setFabOpen(false)} />
+          )}
+          {fabOpen && (
+            <View style={styles.miniFabs}>
+              <RecipeMiniFabRow
+                label="Agregar ingrediente a producto actual"
+                icon="add-circle-outline"
+                onPress={() => { setFabOpen(false); setShowAdd(true); }}
+                colors={colors}
+                typography={typography}
+              />
+              <RecipeMiniFabRow
+                label="Crear nuevo producto"
+                icon="flask-outline"
+                onPress={() => { setFabOpen(false); setShowCreateStyle(true); }}
+                colors={colors}
+                typography={typography}
+              />
+            </View>
+          )}
+          <Pressable
+            style={[styles.fab, { backgroundColor: colors.gold, shadowColor: colors.gold }]}
+            onPress={() => setFabOpen((o) => !o)}
+          >
+            <Ionicons name={fabOpen ? "close" : "add"} size={26} color={colors.bg} />
+          </Pressable>
+        </>
       )}
 
       {showAdd && (
@@ -134,6 +170,17 @@ export default function RecipesScreen() {
           beerStyle={selectedStyle}
           existingIds={(lines ?? []).map((l) => l.materialId)}
           onClose={() => setShowAdd(false)}
+        />
+      )}
+      {showCreateStyle && (
+        <CreateStyleModal
+          onClose={() => setShowCreateStyle(false)}
+          onCreate={(name) => {
+            if (!localStyles.includes(name) && !BASE_STYLES.includes(name)) {
+              setLocalStyles((prev) => [...prev, name]);
+            }
+            setSelectedStyle(name);
+          }}
         />
       )}
       {editing && (
@@ -441,6 +488,100 @@ function EditLineModal({ line, onClose }: { line: RecipeLine; onClose: () => voi
   );
 }
 
+function RecipeMiniFabRow({
+  label, icon, onPress, colors, typography,
+}: {
+  label: string; icon: string; onPress: () => void; colors: Colors; typography: any;
+}) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+      <View style={{
+        paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
+        borderRadius: radius.md, backgroundColor: colors.surface,
+        borderWidth: 1, borderColor: colors.border,
+        shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.15, shadowRadius: 2, elevation: 2,
+      }}>
+        <Text style={[typography.bodySmall, { color: colors.textPrimary }]}>{label}</Text>
+      </View>
+      <Pressable
+        style={{
+          width: 40, height: 40, borderRadius: 20,
+          backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+          alignItems: "center", justifyContent: "center",
+          shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.15, shadowRadius: 2, elevation: 2,
+        }}
+        onPress={onPress}
+        hitSlop={4}
+      >
+        <Ionicons name={icon as any} size={18} color={colors.textSecondary} />
+      </Pressable>
+    </View>
+  );
+}
+
+function CreateStyleModal({
+  onClose, onCreate,
+}: {
+  onClose: () => void;
+  onCreate: (name: string) => void;
+}) {
+  const { colors, typography } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const [name, setName] = useState("");
+
+  const handleCreate = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return Alert.alert("Error", "El nombre del producto no puede estar vacío");
+    onCreate(trimmed);
+    onClose();
+  };
+
+  return (
+    <Modal transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.overlay}>
+        <Pressable style={styles.backdrop} onPress={onClose} />
+        <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
+          <View style={styles.sheetHeader}>
+            <Text style={typography.h3}>Nuevo producto</Text>
+            <Pressable onPress={onClose} hitSlop={8}>
+              <Ionicons name="close" size={22} color={colors.textSecondary} />
+            </Pressable>
+          </View>
+          <View style={styles.formContent}>
+            <View style={{ gap: spacing.xs, marginBottom: spacing.md }}>
+              <Text style={typography.label}>NOMBRE DEL ESTILO / PRODUCTO</Text>
+              <TextInput
+                style={{
+                  backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1,
+                  borderColor: colors.border, paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.sm, color: colors.textPrimary, fontSize: 15,
+                }}
+                value={name}
+                onChangeText={setName}
+                placeholder="ej. Session IPA, Amber Ale..."
+                placeholderTextColor={colors.textMuted}
+                autoFocus
+              />
+            </View>
+            <Text style={[typography.caption, { color: colors.textMuted, marginBottom: spacing.md }]}>
+              El producto se guardará permanentemente cuando agregues su primer ingrediente.
+            </Text>
+            <Pressable
+              style={[styles.saveBtn, { backgroundColor: colors.gold }]}
+              onPress={handleCreate}
+            >
+              <Text style={[typography.h4, { color: colors.bg }]}>Crear producto</Text>
+            </Pressable>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 function makeStyles(colors: Colors) {
   return StyleSheet.create({
     container: { flex: 1 },
@@ -455,6 +596,10 @@ function makeStyles(colors: Colors) {
       alignItems: "center", justifyContent: "center",
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.4, shadowRadius: 8, elevation: 8,
+    },
+    miniFabs: {
+      position: "absolute", bottom: spacing.xl + 68, right: spacing.md,
+      gap: spacing.sm, alignItems: "flex-end",
     },
     overlay: { flex: 1, justifyContent: "flex-end" },
     backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)" },

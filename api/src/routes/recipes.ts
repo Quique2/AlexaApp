@@ -3,6 +3,14 @@ import prisma from "../lib/prisma";
 
 const router = Router();
 
+// GET /api/recipes/styles — unique beer style names
+router.get("/styles", async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const rows = await prisma.recipeLine.groupBy({ by: ["beerStyle"], orderBy: { beerStyle: "asc" } });
+    res.json(rows.map((r) => r.beerStyle));
+  } catch (e) { next(e); }
+});
+
 // GET /api/recipes?style=LÃ¶ndon
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
