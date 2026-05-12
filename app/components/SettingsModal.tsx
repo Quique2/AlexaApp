@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Switch,
   Alert,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme, ColorMode } from "../context/ThemeContext";
@@ -34,7 +35,14 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const { colorMode, fontSize, colors, typography, setColorMode, setFontSize } = useTheme();
   const { logout, biometricAvailable, biometricEnabled, enableBiometrics, disableBiometrics } = useAuth();
 
-  function handleLogout() {
+  async function handleLogout() {
+    if (Platform.OS === "web") {
+      // Alert.alert is unreliable on web after a Modal closes; use native confirm
+      if (!window.confirm("¿Seguro que quieres salir?")) return;
+      onClose();
+      await logout();
+      return;
+    }
     onClose();
     Alert.alert("Cerrar sesión", "¿Seguro que quieres salir?", [
       { text: "Cancelar", style: "cancel" },
@@ -43,7 +51,6 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
         style: "destructive",
         onPress: async () => {
           await logout();
-          // AuthNavigator in _layout.tsx handles redirect after state commits
         },
       },
     ]);
