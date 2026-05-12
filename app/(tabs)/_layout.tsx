@@ -40,7 +40,7 @@ export default function TabLayout() {
   const { colors } = useTheme();
   const { user, isLoading, hasRole } = useAuth();
 
-  const canSeeRecipes = hasRole(["DEVELOPER", "SUPERVISOR", "OPERATOR"]);
+  const canSeeRecipes = hasRole(["DEVELOPER", "SUPERVISOR"]);
   const canSeeUsers = hasRole(["DEVELOPER", "SUPERVISOR"]);
 
   // Don't render tabs until auth state is committed — prevents the tab count
