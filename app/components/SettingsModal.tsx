@@ -9,7 +9,6 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import { useTheme, ColorMode } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { spacing, radius } from "../constants/theme";
@@ -34,7 +33,6 @@ const MODE_OPTIONS: { value: ColorMode; label: string; icon: "moon" | "sunny" }[
 export function SettingsModal({ visible, onClose }: SettingsModalProps) {
   const { colorMode, fontSize, colors, typography, setColorMode, setFontSize } = useTheme();
   const { logout, biometricAvailable, biometricEnabled, enableBiometrics, disableBiometrics } = useAuth();
-  const router = useRouter();
 
   function handleLogout() {
     onClose();
@@ -45,7 +43,7 @@ export function SettingsModal({ visible, onClose }: SettingsModalProps) {
         style: "destructive",
         onPress: async () => {
           await logout();
-          router.replace("/login");
+          // AuthNavigator in _layout.tsx handles redirect after state commits
         },
       },
     ]);
