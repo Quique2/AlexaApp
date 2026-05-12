@@ -39,10 +39,9 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login(email.trim().toLowerCase(), password);
-      router.replace("/dashboard");
+      // AuthNavigator in _layout.tsx handles navigation after state commits
     } catch (e: any) {
       setError(e.message ?? "Error al iniciar sesión");
-    } finally {
       setLoading(false);
     }
   }
@@ -52,10 +51,9 @@ export default function LoginScreen() {
     setBioLoading(true);
     try {
       await loginWithBiometrics();
-      router.replace("/dashboard");
+      // AuthNavigator in _layout.tsx handles navigation after state commits
     } catch (e: any) {
       setError(e.message ?? "Error en autenticación biométrica");
-    } finally {
       setBioLoading(false);
     }
   }

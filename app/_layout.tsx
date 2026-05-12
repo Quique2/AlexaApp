@@ -1,8 +1,30 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { AuthProvider } from "./context/AuthContext";
+import { useEffect } from "react";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider, useTheme } from "./context/ThemeContext";
+
+// Handles auth-based navigation via useEffect so it fires AFTER state is committed,
+// preventing the tab layout from rendering with a stale (null) user role.
+function AuthNavigator() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+  const segments = useSegments();
+
+  useEffect(() => {
+    if (isLoading || segments.length === 0) return;
+    const inAuth = segments[0] === "(auth)";
+    const inTabs = segments[0] === "(tabs)";
+    if (user && inAuth) {
+      router.replace("/(tabs)/dashboard");
+    } else if (!user && inTabs) {
+      router.replace("/(auth)/login");
+    }
+  }, [user, isLoading, segments]);
+
+  return null;
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,6 +61,7 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
+          <AuthNavigator />
           <ThemedStack />
         </AuthProvider>
       </ThemeProvider>

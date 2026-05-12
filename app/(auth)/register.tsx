@@ -10,7 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import { Link, useRouter } from "expo-router";
+import { Link } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { spacing, radius, Colors } from "../constants/theme";
 import { useAuth } from "../context/AuthContext";
@@ -19,7 +19,6 @@ import { useTheme } from "../context/ThemeContext";
 export default function RegisterScreen() {
   const { register } = useAuth();
   const { colors, typography } = useTheme();
-  const router = useRouter();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -48,10 +47,9 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register(email.trim().toLowerCase(), password, name.trim() || undefined);
-      router.replace("/dashboard");
+      // AuthNavigator in _layout.tsx handles navigation after state commits
     } catch (e: any) {
       setError(e.message ?? "Error al crear la cuenta");
-    } finally {
       setLoading(false);
     }
   }
