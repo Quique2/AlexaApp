@@ -116,7 +116,6 @@ export default function TabLayout() {
         options={{
           title: "Recetas",
           href: canSeeRecipes ? undefined : null,
-          tabBarButton: canSeeRecipes ? undefined : () => null,
           tabBarIcon: ({ focused, color }) => (
             <TabIcon name="book" focused={focused} color={color} />
           ),
@@ -127,7 +126,6 @@ export default function TabLayout() {
         options={{
           title: "Usuarios",
           href: canSeeUsers ? undefined : null,
-          tabBarButton: canSeeUsers ? undefined : () => null,
           tabBarIcon: ({ focused, color }) => (
             <TabIcon name="people" focused={focused} color={color} />
           ),
