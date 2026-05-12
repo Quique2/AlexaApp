@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Pressable } from "react-native";
+import { Pressable, View } from "react-native";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
@@ -38,10 +38,17 @@ function HeaderRight() {
 
 export default function TabLayout() {
   const { colors } = useTheme();
-  const { hasRole } = useAuth();
+  const { user, isLoading, hasRole } = useAuth();
 
   const canSeeRecipes = hasRole(["DEVELOPER", "SUPERVISOR", "OPERATOR"]);
   const canSeeUsers = hasRole(["DEVELOPER", "SUPERVISOR"]);
+
+  // Don't render tabs until auth state is committed — prevents the tab count
+  // from changing mid-render (null→role) which causes a blank screen on all platforms.
+  // AuthNavigator in _layout.tsx handles redirecting to login when user is null.
+  if (isLoading || !user) {
+    return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  }
 
   return (
     <Tabs
