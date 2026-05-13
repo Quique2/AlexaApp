@@ -340,6 +340,30 @@ function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
               </View>
             )}
 
+            {(item.requirements ?? []).length > 0 && (
+              <View style={[styles.reservedSection, { backgroundColor: colors.greenBg, borderColor: colors.green + "66" }]}>
+                <Text style={[typography.label, { color: colors.green, marginBottom: spacing.xs }]}>
+                  🟢 RESERVADO PARA PRODUCCIÓN
+                </Text>
+                {(item.requirements ?? []).map((req) => req.productionPlan && (
+                  <View key={req.id} style={styles.reservedRow}>
+                    <Text style={[typography.bodySmall, { color: colors.green, flex: 1 }]}>
+                      {req.productionPlan.style}
+                    </Text>
+                    <Text style={[typography.bodySmall, { color: colors.green, fontWeight: "600" }]}>
+                      {req.reservedQuantity} {mat.unit}
+                    </Text>
+                    <Text style={[typography.caption, { color: colors.green + "99", marginLeft: spacing.xs }]}>
+                      {new Date(req.productionPlan.productionDate).toLocaleDateString("es-MX", { day: "numeric", month: "short" })}
+                    </Text>
+                  </View>
+                ))}
+                <Text style={[typography.caption, { color: colors.green + "99", marginTop: spacing.xs }]}>
+                  Se consumirá al llegar la fecha de producción
+                </Text>
+              </View>
+            )}
+
             <View style={styles.fieldGroup}>
               <Field label={`Stock actual (${mat.unit})`} value={stock} onChangeText={setStock} keyboardType="decimal-pad" colors={colors} typography={typography} />
               <Field label={`Consumo diario planado (${mat.unit}/día)`} value={consumption} onChangeText={setConsumption} keyboardType="decimal-pad" colors={colors} typography={typography} />
@@ -596,6 +620,12 @@ function makeStyles(colors: Colors) {
       paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
       borderRadius: radius.md, borderWidth: 1,
     },
+    reservedSection: {
+      marginHorizontal: spacing.md, marginBottom: spacing.sm,
+      paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+      borderRadius: radius.md, borderWidth: 1, gap: 4,
+    },
+    reservedRow: { flexDirection: "row", alignItems: "center" },
     fieldGroup: { paddingHorizontal: spacing.md, gap: spacing.sm, marginBottom: spacing.md },
     infoRow: { flexDirection: "row", paddingHorizontal: spacing.md, marginBottom: spacing.md, gap: spacing.sm },
     saveBtn: { marginHorizontal: spacing.md, borderRadius: radius.md, paddingVertical: spacing.md, alignItems: "center" },

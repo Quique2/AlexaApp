@@ -57,6 +57,7 @@ export interface ProductionRequirement {
   inventoryId: string;
   materialId: string;
   material?: { name: string; unit: string };
+  productionPlan?: { id: string; style: string; productionDate: string } | null;
   requiredQuantity: number;
   reservedQuantity: number;
   missingQuantity: number;
@@ -213,7 +214,7 @@ export interface JITSummary {
 }
 
 export interface DashboardSummary {
-  alerts: { red: number; yellow: number; green: number; none: number; critical: number };
+  alerts: { red: number; yellow: number; green: number; none: number; critical: number; ok: number };
   totalMaterials: number;
   upcoming: {
     plans: (ProductionPlan & { hasCriticalRequirements: boolean })[];

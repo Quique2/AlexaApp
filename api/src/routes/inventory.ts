@@ -30,7 +30,23 @@ router.get("/", requireAuth, async (req: Request, res: Response, next: NextFunct
           ...(search ? { name: { contains: String(search), mode: "insensitive" } } : {}),
         },
       },
-      include: { material: { include: { supplier: true } } },
+      include: {
+        material: { include: { supplier: true } },
+        requirements: {
+          where: {
+            reservedQuantity: { gt: 0 },
+            productionPlan: {
+              signedOffAt: { not: null },
+              productionStatus: { notIn: ["COMPLETED", "CANCELLED"] },
+            },
+          },
+          select: {
+            id: true,
+            reservedQuantity: true,
+            productionPlan: { select: { id: true, style: true, productionDate: true } },
+          },
+        },
+      },
       orderBy: [{ alertStatus: "asc" }, { material: { name: "asc" } }],
     });
     res.json(rows);

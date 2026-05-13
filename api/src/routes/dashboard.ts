@@ -15,13 +15,15 @@ router.get("/summary", async (_req: Request, res: Response, next: NextFunction) 
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-    const [alertCounts, criticalCount, totalMaterials, upcomingPlans, monthlySpend, inTransit] =
+    const [alertCounts, criticalCount, reservedCount, totalMaterials, upcomingPlans, monthlySpend, inTransit] =
       await Promise.all([
         prisma.inventory.groupBy({
           by: ["alertStatus"],
           _count: { alertStatus: true },
         }),
         prisma.inventory.count({ where: { isCritical: true } }),
+        // Materials reserved for a signed-off production plan (visto bueno)
+        prisma.inventory.count({ where: { reservedStock: { gt: 0 } } }),
         prisma.material.count(),
         prisma.productionPlan.findMany({
           where: {
@@ -62,6 +64,7 @@ router.get("/summary", async (_req: Request, res: Response, next: NextFunction) 
         green: alertMap["GREEN"] ?? 0,
         none: alertMap["NONE"] ?? 0,
         critical: criticalCount,
+        ok: reservedCount,
       },
       totalMaterials,
       upcoming: {
