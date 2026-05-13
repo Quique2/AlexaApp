@@ -1,18 +1,8 @@
 import React, { useMemo, useState } from "react";
 import {
-  View,
-  FlatList,
-  Text,
-  StyleSheet,
-  Pressable,
-  ActivityIndicator,
-  RefreshControl,
-  Modal,
-  ScrollView,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
+  View, FlatList, Text, StyleSheet, Pressable, ActivityIndicator,
+  RefreshControl, Modal, ScrollView, TextInput, KeyboardAvoidingView,
+  Platform, Alert, SectionList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { spacing, radius, Colors } from "../constants/theme";
@@ -27,7 +17,6 @@ const STATUS_FILTERS: { label: string; value: string }[] = [
   { label: "Todos", value: "" },
   { label: "Pendientes", value: "PENDING" },
   { label: "En tránsito", value: "IN_TRANSIT" },
-  { label: "Recibidos", value: "RECEIVED_COMPLETE" },
   { label: "Cancelados", value: "CANCELLED" },
 ];
 
@@ -44,6 +33,11 @@ function formatDate(iso: string | null | undefined) {
   return new Date(iso).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "2-digit" });
 }
 
+function formatDateLong(iso: string | null | undefined) {
+  if (!iso) return "Sin fecha";
+  return new Date(iso).toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short" });
+}
+
 function daysUntil(iso: string | null | undefined, colors: Colors) {
   if (!iso) return null;
   const diff = Math.ceil((new Date(iso).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
@@ -53,16 +47,86 @@ function daysUntil(iso: string | null | undefined, colors: Colors) {
   return { label: `En ${diff}d`, color: colors.textSecondary };
 }
 
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+function getTimeliness(order: Order): "ON_TIME" | "LATE" | "NOT_RECEIVED" | null {
+  const isReceived = order.status === "RECEIVED_COMPLETE" || order.status === "RECEIVED_PARTIAL";
+  if (isReceived) {
+    if (!order.estimatedArrivalDate || !order.receptions?.length) return null;
+    const lastReceptionDate = order.receptions
+      .map((r: any) => new Date(r.receptionDate).getTime())
+      .sort((a: number, b: number) => b - a)[0];
+    const estimated = new Date(order.estimatedArrivalDate).getTime();
+    return lastReceptionDate <= estimated ? "ON_TIME" : "LATE";
+  }
+  if (
+    (order.status === "PENDING" || order.status === "IN_TRANSIT") &&
+    order.estimatedArrivalDate &&
+    new Date(order.estimatedArrivalDate).getTime() < Date.now() - SEVEN_DAYS_MS
+  ) {
+    return "NOT_RECEIVED";
+  }
+  return null;
+}
+
+function isHistoryOrder(order: Order): boolean {
+  return (
+    order.status === "RECEIVED_COMPLETE" ||
+    order.status === "RECEIVED_PARTIAL" ||
+    getTimeliness(order) === "NOT_RECEIVED"
+  );
+}
+
 export default function OrdersScreen() {
   const { colors, typography } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
+  const [showHistory, setShowHistory] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
   const [receiveOrder, setReceiveOrder] = useState<Order | null>(null);
 
-  const params = statusFilter ? { status: statusFilter } : undefined;
-  const { data: orders, isLoading, refetch, isRefetching } = useOrders(params);
+  const activeParams = useMemo(
+    () => statusFilter ? { status: statusFilter } : undefined,
+    [statusFilter]
+  );
+  const { data: activeOrders, isLoading: loadingActive, refetch: refetchActive, isRefetching: refetchingActive } = useOrders(activeParams);
+  const { data: allOrders, isLoading: loadingHistory, refetch: refetchHistory, isRefetching: refetchingHistory } = useOrders();
   const updateMutation = useUpdateOrder();
+
+  const displayOrders = useMemo(() => {
+    if (!activeOrders) return [];
+    return activeOrders.filter((o) => !isHistoryOrder(o));
+  }, [activeOrders]);
+
+  const historyGroups = useMemo(() => {
+    if (!allOrders) return [];
+    const items = allOrders.filter(isHistoryOrder);
+    const map = new Map<string, { key: string; title: string; subtitle: string; data: Order[] }>();
+    for (const order of items) {
+      const key = order.productionPlanId ?? "__none__";
+      if (!map.has(key)) {
+        const plan = order.productionPlan;
+        map.set(key, {
+          key,
+          title: plan ? plan.style : "Sin plan de producción",
+          subtitle: plan ? formatDateLong(plan.productionDate) : "",
+          data: [],
+        });
+      }
+      map.get(key)!.data.push(order);
+    }
+    return Array.from(map.values()).sort((a, b) => {
+      const aDate = a.data[0]?.productionPlan?.productionDate;
+      const bDate = b.data[0]?.productionPlan?.productionDate;
+      if (!aDate) return 1;
+      if (!bDate) return -1;
+      return new Date(bDate).getTime() - new Date(aDate).getTime();
+    });
+  }, [allOrders]);
+
+  const totalCost = displayOrders.reduce((a, o) => a + estimatedCost(o), 0);
+  const pendingCount = displayOrders.filter((o) => o.status === "PENDING").length;
+  const transitCount = displayOrders.filter((o) => o.status === "IN_TRANSIT").length;
 
   const advanceStatus = (order: Order) => {
     const next: Partial<Record<OrderStatus, OrderStatus>> = { PENDING: "IN_TRANSIT" };
@@ -74,9 +138,9 @@ export default function OrdersScreen() {
     }
   };
 
-  const totalCost = orders?.reduce((a, o) => a + estimatedCost(o), 0) ?? 0;
-  const pendingCount = orders?.filter((o) => o.status === "PENDING").length ?? 0;
-  const transitCount = orders?.filter((o) => o.status === "IN_TRANSIT").length ?? 0;
+  const isLoading = showHistory ? loadingHistory : loadingActive;
+  const isRefetching = showHistory ? refetchingHistory : refetchingActive;
+  const refetch = showHistory ? refetchHistory : refetchActive;
 
   if (isLoading) {
     return (
@@ -88,93 +152,166 @@ export default function OrdersScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      <View style={styles.summaryRow}>
-        <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.summaryValue, { color: colors.gold }]}>{MXN(totalCost)}</Text>
-          <Text style={typography.caption}>Costo total</Text>
+      {/* Summary + toggle */}
+      {!showHistory && (
+        <View style={styles.summaryRow}>
+          <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.summaryValue, { color: colors.gold }]}>{MXN(totalCost)}</Text>
+            <Text style={typography.caption}>Costo total</Text>
+          </View>
+          <View style={[styles.summaryCard, styles.summaryCardSmall, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.summaryValue, { color: colors.yellow, fontSize: 20 }]}>{pendingCount}</Text>
+            <Text style={typography.caption}>Pendientes</Text>
+          </View>
+          <View style={[styles.summaryCard, styles.summaryCardSmall, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.summaryValue, { color: colors.gold, fontSize: 20 }]}>{transitCount}</Text>
+            <Text style={typography.caption}>En tránsito</Text>
+          </View>
         </View>
-        <View style={[styles.summaryCard, styles.summaryCardSmall, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.summaryValue, { color: colors.yellow, fontSize: 20 }]}>{pendingCount}</Text>
-          <Text style={typography.caption}>Pendientes</Text>
-        </View>
-        <View style={[styles.summaryCard, styles.summaryCardSmall, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.summaryValue, { color: colors.gold, fontSize: 20 }]}>{transitCount}</Text>
-          <Text style={typography.caption}>En tránsito</Text>
-        </View>
+      )}
+
+      {/* Tabs row */}
+      <View style={styles.tabRow}>
+        <Pressable
+          style={[styles.tabBtn, !showHistory && { borderColor: colors.gold, backgroundColor: colors.goldDim + "22" }]}
+          onPress={() => setShowHistory(false)}
+        >
+          <Text style={[typography.label, { fontSize: 11, color: !showHistory ? colors.gold : colors.textMuted }]}>
+            ACTIVOS
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.tabBtn, showHistory && { borderColor: colors.gold, backgroundColor: colors.goldDim + "22" }]}
+          onPress={() => setShowHistory(true)}
+        >
+          <Text style={[typography.label, { fontSize: 11, color: showHistory ? colors.gold : colors.textMuted }]}>
+            HISTORIAL
+          </Text>
+        </Pressable>
       </View>
 
-      <View style={styles.filterRow}>
-        {STATUS_FILTERS.map((f) => (
-          <Pressable
-            key={f.value}
-            style={[
-              styles.filterTab,
-              { borderColor: colors.border, backgroundColor: colors.card },
-              statusFilter === f.value && { borderColor: colors.gold, backgroundColor: colors.goldDim + "33" },
-            ]}
-            onPress={() => setStatusFilter(f.value)}
-          >
-            <Text
-              style={[
-                typography.label,
-                { fontSize: 10, color: colors.textMuted },
-                statusFilter === f.value && { color: colors.gold },
-              ]}
-            >
-              {f.label}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <FlatList
-        data={orders}
-        keyExtractor={(o) => o.id}
-        refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.gold} />
-        }
-        contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => (
-          <OrderCard order={item} onAdvance={advanceStatus} advancing={updateMutation.isPending} />
-        )}
-        ListEmptyComponent={
-          <EmptyState
-            icon="📋"
-            title="Sin pedidos"
-            subtitle={
-              statusFilter
-                ? "No hay pedidos con este estado"
-                : "Genera pedidos desde la pantalla de Producción"
+      {/* Active view */}
+      {!showHistory && (
+        <>
+          <View style={styles.filterRow}>
+            {STATUS_FILTERS.map((f) => (
+              <Pressable
+                key={f.value}
+                style={[
+                  styles.filterTab,
+                  { borderColor: colors.border, backgroundColor: colors.card },
+                  statusFilter === f.value && { borderColor: colors.gold, backgroundColor: colors.goldDim + "33" },
+                ]}
+                onPress={() => setStatusFilter(f.value)}
+              >
+                <Text style={[typography.label, { fontSize: 10, color: statusFilter === f.value ? colors.gold : colors.textMuted }]}>
+                  {f.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <FlatList
+            data={displayOrders}
+            keyExtractor={(o) => o.id}
+            refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.gold} />}
+            contentContainerStyle={styles.listContent}
+            renderItem={({ item }) => (
+              <OrderCard order={item} onAdvance={advanceStatus} advancing={updateMutation.isPending} />
+            )}
+            ListEmptyComponent={
+              <EmptyState
+                icon="📋"
+                title="Sin pedidos activos"
+                subtitle={statusFilter ? "No hay pedidos con este estado" : "Genera pedidos desde Producción"}
+              />
             }
           />
-        }
-      />
+        </>
+      )}
+
+      {/* History view */}
+      {showHistory && (
+        <SectionList
+          sections={historyGroups}
+          keyExtractor={(o) => o.id}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.gold} />}
+          contentContainerStyle={styles.listContent}
+          renderSectionHeader={({ section }) => (
+            <View style={[styles.sectionHeader, { backgroundColor: colors.bg, borderBottomColor: colors.border }]}>
+              <Text style={[typography.h4, { fontSize: 13 }]}>{section.title}</Text>
+              {section.subtitle ? (
+                <Text style={[typography.caption, { color: colors.gold }]}>{section.subtitle}</Text>
+              ) : null}
+            </View>
+          )}
+          renderItem={({ item }) => (
+            <HistoryOrderCard order={item} colors={colors} typography={typography} />
+          )}
+          ListEmptyComponent={
+            <EmptyState icon="📦" title="Sin historial" subtitle="Los pedidos recibidos aparecerán aquí" />
+          }
+        />
+      )}
 
       {receiveOrder && (
-        <ReceiveModal order={receiveOrder} onClose={() => setReceiveOrder(null)} />
+        <ReceiveModal
+          order={receiveOrder}
+          onClose={() => setReceiveOrder(null)}
+          onDone={() => { setReceiveOrder(null); setShowHistory(true); }}
+        />
       )}
     </View>
   );
 }
 
-function OrderCard({
-  order,
-  onAdvance,
-  advancing,
-}: {
-  order: Order;
-  onAdvance: (o: Order) => void;
-  advancing: boolean;
-}) {
+function HistoryOrderCard({ order, colors, typography }: { order: Order; colors: Colors; typography: any }) {
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const timeliness = getTimeliness(order);
+
+  const timelinessConfig = {
+    ON_TIME:      { label: "A TIEMPO",     color: colors.green, bg: colors.greenBg },
+    LATE:         { label: "CON ATRASO",   color: colors.red,   bg: colors.redBg },
+    NOT_RECEIVED: { label: "NO RECIBIDO",  color: colors.textMuted, bg: colors.surface },
+  };
+  const tCfg = timeliness ? timelinessConfig[timeliness] : null;
+
+  return (
+    <View style={[styles.historyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={[typography.h4, { fontSize: 13 }]} numberOfLines={1}>
+          {order.material?.name ?? "—"}
+        </Text>
+        <Text style={typography.caption}>
+          {order.orderedQuantity} {order.material?.unit ?? ""} · {order.supplier?.name?.split("(")[0].trim() ?? "Sin proveedor"}
+        </Text>
+        {order.estimatedArrivalDate && (
+          <Text style={typography.caption}>
+            Estimado: {formatDate(order.estimatedArrivalDate)}
+          </Text>
+        )}
+        {order.totalPaid != null && (
+          <Text style={[typography.caption, { color: colors.cream }]}>{MXN(order.totalPaid)}</Text>
+        )}
+      </View>
+      {tCfg && (
+        <View style={[styles.timelinessTag, { backgroundColor: tCfg.bg, borderColor: tCfg.color }]}>
+          <Text style={[typography.label, { fontSize: 8, color: tCfg.color }]}>{tCfg.label}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function OrderCard({ order, onAdvance, advancing }: { order: Order; onAdvance: (o: Order) => void; advancing: boolean }) {
   const { colors, typography } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const statusConfig = useMemo(() => ({
-    PENDING:           { label: "Pendiente",     color: colors.yellow, bg: colors.yellowBg, icon: "time-outline" },
+    PENDING:           { label: "Pendiente",     color: colors.yellow, bg: colors.yellowBg,     icon: "time-outline" },
     IN_TRANSIT:        { label: "En tránsito",    color: colors.gold,   bg: colors.goldDim + "44", icon: "airplane-outline" },
-    RECEIVED_COMPLETE: { label: "Recibido",       color: colors.green,  bg: colors.greenBg, icon: "checkmark-circle-outline" },
-    RECEIVED_PARTIAL:  { label: "Parc. recibido", color: colors.yellow, bg: colors.yellowBg, icon: "alert-circle-outline" },
-    CANCELLED:         { label: "Cancelado",      color: colors.none,   bg: colors.noneBg,  icon: "close-circle-outline" },
+    RECEIVED_COMPLETE: { label: "Recibido",       color: colors.green,  bg: colors.greenBg,     icon: "checkmark-circle-outline" },
+    RECEIVED_PARTIAL:  { label: "Parc. recibido", color: colors.yellow, bg: colors.yellowBg,    icon: "alert-circle-outline" },
+    CANCELLED:         { label: "Cancelado",      color: colors.none,   bg: colors.noneBg,      icon: "close-circle-outline" },
   }), [colors]);
 
   const cfg = statusConfig[order.status];
@@ -211,7 +348,7 @@ function OrderCard({
         <MetaCell label="Pedido" value={formatDate(order.orderDate)} typography={typography} colors={colors} />
       </View>
 
-      {arrival && order.status !== "RECEIVED_COMPLETE" && order.status !== "CANCELLED" && (
+      {arrival && (
         <View style={styles.arrivalChip}>
           <Ionicons name="calendar-outline" size={11} color={arrival.color} />
           <Text style={[typography.caption, { color: arrival.color }]}>
@@ -248,33 +385,21 @@ function OrderCard({
   );
 }
 
-function MetaCell({
-  label, value, valueColor, typography, colors,
-}: {
-  label: string;
-  value: string;
-  valueColor?: string;
-  typography: any;
-  colors: Colors;
+function MetaCell({ label, value, valueColor, typography, colors }: {
+  label: string; value: string; valueColor?: string; typography: any; colors: Colors;
 }) {
   return (
     <View style={metaCellStyles.cell}>
       <Text style={typography.caption}>{label}</Text>
-      <Text
-        style={[typography.bodySmall, { fontWeight: "600", color: valueColor ?? colors.textPrimary, marginTop: 1 }]}
-        numberOfLines={1}
-      >
+      <Text style={[typography.bodySmall, { fontWeight: "600", color: valueColor ?? colors.textPrimary, marginTop: 1 }]} numberOfLines={1}>
         {value}
       </Text>
     </View>
   );
 }
+const metaCellStyles = StyleSheet.create({ cell: { minWidth: 80, flex: 1 } });
 
-const metaCellStyles = StyleSheet.create({
-  cell: { minWidth: 80, flex: 1 },
-});
-
-function ReceiveModal({ order, onClose }: { order: Order; onClose: () => void }) {
+function ReceiveModal({ order, onClose, onDone }: { order: Order; onClose: () => void; onDone: () => void }) {
   const { colors, typography } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -308,24 +433,16 @@ function ReceiveModal({ order, onClose }: { order: Order; onClose: () => void })
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["inventory"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-      Alert.alert(
-        "✅ Recepción registrada",
-        `${qty} ${order.material?.unit ?? ""} de ${order.material?.name} agregados al inventario.`,
-        [{ text: "OK", onPress: onClose }]
-      );
+      onDone();
     } catch (e: any) {
       Alert.alert("Error", e.message);
-    } finally {
       setLoading(false);
     }
   };
 
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.overlay}
-      >
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
           <View style={[styles.handle, { backgroundColor: colors.border }]} />
@@ -368,29 +485,18 @@ function ReceiveModal({ order, onClose }: { order: Order; onClose: () => void })
   );
 }
 
-function ReceiveField({
-  label, value, onChangeText, keyboardType, colors, typography,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (v: string) => void;
-  keyboardType?: "decimal-pad" | "number-pad";
-  colors: Colors;
-  typography: any;
+function ReceiveField({ label, value, onChangeText, keyboardType, colors, typography }: {
+  label: string; value: string; onChangeText: (v: string) => void;
+  keyboardType?: "decimal-pad" | "number-pad"; colors: Colors; typography: any;
 }) {
   return (
     <View style={{ marginBottom: spacing.sm }}>
       <Text style={[typography.label, { marginBottom: 4 }]}>{label}</Text>
       <TextInput
         style={{
-          backgroundColor: colors.card,
-          borderRadius: radius.md,
-          borderWidth: 1,
-          borderColor: colors.border,
-          paddingHorizontal: spacing.md,
-          paddingVertical: spacing.sm,
-          color: colors.textPrimary,
-          fontSize: 15,
+          backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1,
+          borderColor: colors.border, paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm, color: colors.textPrimary, fontSize: 15,
         }}
         value={value}
         onChangeText={onChangeText}
@@ -406,110 +512,75 @@ function makeStyles(colors: Colors) {
     container: { flex: 1 },
     loading: { flex: 1, alignItems: "center", justifyContent: "center" },
     listContent: { paddingBottom: spacing.xxl },
-
     summaryRow: {
-      flexDirection: "row",
-      gap: spacing.sm,
-      paddingHorizontal: spacing.md,
-      paddingTop: spacing.md,
-      paddingBottom: spacing.xs,
+      flexDirection: "row", gap: spacing.sm,
+      paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.xs,
     },
-    summaryCard: {
-      flex: 2,
-      borderRadius: radius.md,
-      padding: spacing.md,
-      borderWidth: 1,
-    },
+    summaryCard: { flex: 2, borderRadius: radius.md, padding: spacing.md, borderWidth: 1 },
     summaryCardSmall: { flex: 1 },
     summaryValue: { fontSize: 18, fontWeight: "700", letterSpacing: -0.5 },
-
+    tabRow: {
+      flexDirection: "row", gap: spacing.xs,
+      paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    },
+    tabBtn: {
+      paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
+      borderRadius: radius.full, borderWidth: 1, borderColor: colors.border,
+    },
     filterRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: spacing.xs,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
+      flexDirection: "row", flexWrap: "wrap", gap: spacing.xs,
+      paddingHorizontal: spacing.md, paddingBottom: spacing.sm,
     },
     filterTab: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xs,
-      borderRadius: radius.full,
-      borderWidth: 1,
+      paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
+      borderRadius: radius.full, borderWidth: 1,
     },
-
+    sectionHeader: {
+      paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+      borderBottomWidth: 1, gap: 2,
+    },
     card: {
-      marginHorizontal: spacing.md,
-      marginBottom: spacing.sm,
-      borderRadius: radius.md,
-      borderWidth: 1,
-      padding: spacing.md,
+      marginHorizontal: spacing.md, marginBottom: spacing.sm,
+      borderRadius: radius.md, borderWidth: 1, padding: spacing.md, gap: spacing.sm,
+    },
+    historyCard: {
+      flexDirection: "row", alignItems: "center",
+      marginHorizontal: spacing.md, marginBottom: spacing.xs,
+      borderRadius: radius.md, borderWidth: 1,
+      paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
       gap: spacing.sm,
     },
-    cardTop: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      justifyContent: "space-between",
-      gap: spacing.sm,
+    timelinessTag: {
+      paddingHorizontal: spacing.sm, paddingVertical: 3,
+      borderRadius: radius.sm, borderWidth: 1, alignSelf: "flex-start",
     },
+    cardTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.sm },
     cardTitleBlock: { flex: 1, gap: 2 },
     statusPill: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 4,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 3,
-      borderRadius: radius.full,
-      borderWidth: 1,
+      flexDirection: "row", alignItems: "center", gap: 4,
+      paddingHorizontal: spacing.sm, paddingVertical: 3,
+      borderRadius: radius.full, borderWidth: 1,
     },
     metaGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
     arrivalChip: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start" },
     advanceBtn: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: spacing.xs,
-      alignSelf: "flex-start",
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xs + 2,
-      borderRadius: radius.sm,
-      borderWidth: 1,
+      flexDirection: "row", alignItems: "center", gap: spacing.xs,
+      alignSelf: "flex-start", paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs + 2, borderRadius: radius.sm, borderWidth: 1,
     },
-
     overlay: { flex: 1, justifyContent: "flex-end" },
     backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)" },
-    sheet: {
-      borderTopLeftRadius: radius.xl,
-      borderTopRightRadius: radius.xl,
-      maxHeight: "85%",
-    },
+    sheet: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, maxHeight: "85%" },
     handle: {
-      width: 40,
-      height: 4,
-      borderRadius: 2,
-      alignSelf: "center",
-      marginTop: spacing.sm,
-      marginBottom: spacing.md,
+      width: 40, height: 4, borderRadius: 2,
+      alignSelf: "center", marginTop: spacing.sm, marginBottom: spacing.md,
     },
     sheetHeader: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      justifyContent: "space-between",
-      paddingHorizontal: spacing.md,
-      paddingBottom: spacing.md,
+      flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between",
+      paddingHorizontal: spacing.md, paddingBottom: spacing.md,
     },
     sheetContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.xxl },
-
-    infoBox: {
-      borderRadius: radius.md,
-      borderWidth: 1,
-      padding: spacing.sm,
-      marginTop: spacing.xs,
-      marginBottom: spacing.sm,
-    },
-    confirmBtn: {
-      borderRadius: radius.md,
-      paddingVertical: spacing.md,
-      alignItems: "center",
-      marginTop: spacing.xs,
-    },
+    infoBox: { borderRadius: radius.md, borderWidth: 1, padding: spacing.sm, marginTop: spacing.xs, marginBottom: spacing.sm },
+    confirmBtn: { borderRadius: radius.md, paddingVertical: spacing.md, alignItems: "center", marginTop: spacing.xs },
   });
 }
