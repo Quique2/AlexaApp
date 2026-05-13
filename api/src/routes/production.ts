@@ -192,6 +192,12 @@ router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunc
     if (approvalStatus === "APPROVED") {
       await calculateProductionRequirements(plan.id);
       await reserveStockForPlan(plan.id);
+      // Recalculate alert statuses so inventory reflects new requirements immediately
+      const reqs = await prisma.productionRequirement.findMany({
+        where: { productionPlanId: plan.id },
+        select: { inventoryId: true },
+      });
+      await Promise.all([...new Set(reqs.map((r) => r.inventoryId))].map(recalculateInventoryAlertStatus));
     }
 
     res.status(201).json(plan);
@@ -230,6 +236,11 @@ router.post(
       // Compute JIT requirements and reserve stock
       await calculateProductionRequirements(plan.id);
       await reserveStockForPlan(plan.id);
+      const approveReqs = await prisma.productionRequirement.findMany({
+        where: { productionPlanId: plan.id },
+        select: { inventoryId: true },
+      });
+      await Promise.all([...new Set(approveReqs.map((r) => r.inventoryId))].map(recalculateInventoryAlertStatus));
 
       res.json(updated);
     } catch (e) {
