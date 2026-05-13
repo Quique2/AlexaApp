@@ -14,6 +14,7 @@ import {
   recalculateReservedStock,
   recalculateInventoryAlertStatus,
   checkAndAutoSignOffPlan,
+  roundQty,
 } from "../lib/jit";
 
 const router = Router();
@@ -310,7 +311,13 @@ router.post(
 
       await reserveStockForPlan(plan.id);
 
-      // Recalculate alert statuses so dashboard reflects the new OK state immediately
+      // Auto-advance any PENDING orders for this plan → IN_TRANSIT
+      await prisma.order.updateMany({
+        where: { productionPlanId: plan.id, status: "PENDING" },
+        data: { status: "IN_TRANSIT" },
+      });
+
+      // Recalculate alert statuses so dashboard reflects the new state immediately
       const affectedInventories = await prisma.productionRequirement.findMany({
         where: { productionPlanId: plan.id },
         select: { inventoryId: true },
@@ -562,7 +569,7 @@ router.post(
             materialId: p.materialId,
             supplierId: p.supplierId,
             productionPlanId: plan.id,
-            orderedQuantity: p.missingQuantity,
+            orderedQuantity: roundQty(p.missingQuantity),
             estimatedArrivalDate: arrival,
             status: "PENDING",
             month,

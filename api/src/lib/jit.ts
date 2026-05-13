@@ -1,6 +1,11 @@
 import prisma from "./prisma";
 import type { AlertStatus, ActionStatus } from "@prisma/client";
 
+/** Rounds a float to 8 significant figures — eliminates IEEE-754 artifacts before DB writes. */
+export function roundQty(n: number): number {
+  return parseFloat(n.toPrecision(8));
+}
+
 // ─── Alert status computation (based on order timing vs production date) ─────
 
 /**
@@ -201,7 +206,7 @@ export async function calculateProductionRequirements(planId: string): Promise<v
 
     affectedInventoryIds.push(inventory.id);
 
-    const requiredQuantity = line.qtyPerBatch * plan.plannedBatches;
+    const requiredQuantity = roundQty(line.qtyPerBatch * plan.plannedBatches);
     const incomingQty = await calculateIncomingQuantity(material.id);
 
     // Reservations from other signed-off plans (exclude this plan's own reservation)
@@ -221,7 +226,7 @@ export async function calculateProductionRequirements(planId: string): Promise<v
 
     // Effective stock available to this plan
     const effectiveAvailable = Math.max(0, inventory.currentStock - otherReserved + incomingQty);
-    const missingQuantity = Math.max(0, requiredQuantity - effectiveAvailable);
+    const missingQuantity = roundQty(Math.max(0, requiredQuantity - effectiveAvailable));
 
     // Critical: there's a gap AND incoming orders don't fully cover it
     const isCritical = missingQuantity > 0 && incomingQty < missingQuantity;

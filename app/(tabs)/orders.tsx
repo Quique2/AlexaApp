@@ -12,6 +12,7 @@ import { useOrders, useUpdateOrder } from "../hooks/useOrders";
 import { receptionsApi, ordersApi } from "../services/api";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Order, OrderStatus } from "../types";
+import { fmt } from "../utils/fmt";
 
 const STATUS_FILTERS: { label: string; value: string }[] = [
   { label: "Todos", value: "" },
@@ -282,7 +283,7 @@ function HistoryOrderCard({ order, colors, typography }: { order: Order; colors:
           {order.material?.name ?? "—"}
         </Text>
         <Text style={typography.caption}>
-          {order.orderedQuantity} {order.material?.unit ?? ""} · {order.supplier?.name?.split("(")[0].trim() ?? "Sin proveedor"}
+          {fmt(order.orderedQuantity)} {order.material?.unit ?? ""} · {order.supplier?.name?.split("(")[0].trim() ?? "Sin proveedor"}
         </Text>
         {order.estimatedArrivalDate && (
           <Text style={typography.caption}>
@@ -337,7 +338,7 @@ function OrderCard({ order, onAdvance, advancing }: { order: Order; onAdvance: (
 
       <View style={styles.metaGrid}>
         <MetaCell label="Proveedor" value={order.supplier?.name?.split("(")[0].trim() ?? "—"} typography={typography} colors={colors} />
-        <MetaCell label="Cantidad" value={`${order.orderedQuantity} ${order.material?.unit ?? ""}`} typography={typography} colors={colors} />
+        <MetaCell label="Cantidad" value={`${fmt(order.orderedQuantity)} ${order.material?.unit ?? ""}`} typography={typography} colors={colors} />
         <MetaCell
           label={isEstimated ? "Costo est." : "Costo final"}
           value={MXN(cost)}
@@ -403,7 +404,7 @@ function ReceiveModal({ order, onClose, onDone }: { order: Order; onClose: () =>
   const { colors, typography } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const [qty, setQty] = useState(String(order.orderedQuantity));
+  const [qty, setQty] = useState(fmt(order.orderedQuantity));
   const [cost, setCost] = useState(
     order.totalPaid != null
       ? String(order.totalPaid)

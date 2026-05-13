@@ -16,6 +16,7 @@ import { AlertBadge } from "../components/AlertBadge";
 import { EmptyState } from "../components/EmptyState";
 import { useInventory, useUpdateInventory } from "../hooks/useInventory";
 import { inventoryApi, materialsApi } from "../services/api";
+import { fmt } from "../utils/fmt";
 import type { InventoryRow as IRow, MaterialType } from "../types";
 
 const ALERT_FILTERS = [
@@ -338,7 +339,7 @@ function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
                       {req.productionPlan.style}
                     </Text>
                     <Text style={[typography.bodySmall, { color: colors.green, fontWeight: "600" }]}>
-                      {req.reservedQuantity} {mat.unit}
+                      {fmt(req.reservedQuantity)} {mat.unit}
                     </Text>
                     <Text style={[typography.caption, { color: colors.green + "99", marginLeft: spacing.xs }]}>
                       {new Date(req.productionPlan.productionDate).toLocaleDateString("es-MX", { day: "numeric", month: "short" })}

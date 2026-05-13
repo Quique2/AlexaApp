@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
 import multer from "multer";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
-import { syncInventoryState } from "../lib/jit";
+import { syncInventoryState, roundQty } from "../lib/jit";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -169,7 +169,7 @@ router.post(
         await prisma.inventory.update({
           where: { materialId: id },
           data: {
-            currentStock: stockRaw,
+            currentStock: roundQty(stockRaw),
             notes: String(row["notas"] ?? "").trim() || inv.notes,
           },
         });
@@ -230,7 +230,10 @@ router.get("/:materialId", requireAuth, async (req: Request, res: Response, next
 // PUT /api/inventory/:materialId
 router.put("/:materialId", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const updates = UpdateSchema.parse(req.body);
+    const raw = UpdateSchema.parse(req.body);
+    const updates = raw.currentStock !== undefined
+      ? { ...raw, currentStock: roundQty(raw.currentStock) }
+      : raw;
     const current = await prisma.inventory.findUnique({
       where: { materialId: req.params.materialId },
     });

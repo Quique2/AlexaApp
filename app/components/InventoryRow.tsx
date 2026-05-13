@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable } from "react-native";
 import { spacing, radius, Colors } from "../constants/theme";
 import { useTheme } from "../context/ThemeContext";
 import { AlertBadge } from "./AlertBadge";
+import { fmt } from "../utils/fmt";
 import type { InventoryRow as IRow } from "../types";
 
 interface InventoryRowProps {
@@ -17,10 +18,6 @@ const TYPE_LABELS: Record<string, string> = {
   ADJUNTO: "Adjunto",
   OTRO: "Otro",
 };
-
-function fmt(n: number): string {
-  return parseFloat(n.toPrecision(8)).toString();
-}
 
 export function InventoryRow({ item, onPress }: InventoryRowProps) {
   const { colors, typography } = useTheme();

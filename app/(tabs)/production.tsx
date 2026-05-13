@@ -22,6 +22,7 @@ import {
   useSignOffProductionPlan,
 } from "../hooks/useProduction";
 import { recipesApi } from "../services/api";
+import { fmt } from "../utils/fmt";
 import type { ProductionPlan, GenerateOrdersPreview } from "../types";
 
 const STYLES = ["Löndon", "Whïte", "Kölsh", "Mëxican IPA", "Monterrëy Stout", "Edición especial"];
@@ -322,7 +323,7 @@ function PlanCard({
         <Text style={[typography.bodySmall, { fontWeight: "600", color: colors.textPrimary }]}>
           {plan.plannedBatches} lote{plan.plannedBatches > 1 ? "s" : ""}
         </Text>
-        <Text style={typography.caption}>{plan.totalMaltKg}kg malta</Text>
+        <Text style={typography.caption}>{fmt(plan.totalMaltKg)}kg malta</Text>
         {plan.estimatedCost > 0 && (
           <Text style={[typography.caption, { color: plan.hasMissingPrices ? colors.gold : colors.textSecondary }]}>
             {MXN(plan.estimatedCost)}{plan.hasMissingPrices ? " ⚠" : ""}
@@ -563,11 +564,11 @@ function GenerateOrdersModal({ plan, onClose }: { plan: ProductionPlan; onClose:
                       <View key={item.materialId} style={[styles.previewRow, { borderBottomColor: colors.border }]}>
                         <View style={styles.previewLeft}>
                           <Text style={[typography.h4, { fontSize: 13 }]}>{item.materialName}</Text>
-                          <Text style={typography.caption}>{item.supplierName ?? "Sin proveedor"} · Stock: {item.currentStock}{item.unit}</Text>
+                          <Text style={typography.caption}>{item.supplierName ?? "Sin proveedor"} · Stock: {fmt(item.currentStock)}{item.unit}</Text>
                         </View>
                         <View style={styles.previewRight}>
                           <Text style={[typography.bodySmall, { fontWeight: "700", color: item.isCritical ? colors.red : colors.gold }]}>
-                            {item.missingQuantity.toFixed(2)} {item.unit}
+                            {fmt(item.missingQuantity)} {item.unit}
                           </Text>
                           <Text style={[typography.caption, { color: colors.textSecondary }]}>{MXN(item.estimatedCost)}</Text>
                           {item.isCritical && (
@@ -590,7 +591,7 @@ function GenerateOrdersModal({ plan, onClose }: { plan: ProductionPlan; onClose:
                       <View key={item.materialId} style={[styles.previewRow, { borderBottomColor: colors.border, opacity: 0.5 }]}>
                         <View style={styles.previewLeft}>
                           <Text style={[typography.h4, { fontSize: 13 }]}>{item.materialName}</Text>
-                          <Text style={typography.caption}>Stock: {item.currentStock} {item.unit}</Text>
+                          <Text style={typography.caption}>Stock: {fmt(item.currentStock)} {item.unit}</Text>
                         </View>
                         <Ionicons name="checkmark-circle" size={18} color={colors.green} />
                       </View>
