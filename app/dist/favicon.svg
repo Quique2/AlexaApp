@@ -1,33 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <radialGradient id="glow" cx="50%" cy="55%" r="48%">
-      <stop offset="0%" stop-color="#C4962A" stop-opacity="0.14"/>
-      <stop offset="100%" stop-color="#0C0C0C" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
+  <style>
+    .bg     { fill: #0C0C0C; }
+    .border { fill: none; stroke: #FFFFFF; stroke-width: 1.2; opacity: 0.45; }
+    .rule   { stroke: #FFFFFF; stroke-width: 0.9; opacity: 0.4; }
+    .txt    { fill: #FFFFFF; }
+    @media (prefers-color-scheme: light) {
+      .bg     { fill: #FFFFFF; }
+      .border { stroke: #0C0C0C; opacity: 0.3; }
+      .rule   { stroke: #0C0C0C; opacity: 0.25; }
+      .txt    { fill: #0C0C0C; }
+    }
+  </style>
 
-  <!-- Background -->
-  <rect width="64" height="64" rx="9" fill="#0C0C0C"/>
-  <!-- Warm amber center glow -->
-  <rect width="64" height="64" rx="9" fill="url(#glow)"/>
-  <!-- Gold perimeter border -->
-  <rect x="1.5" y="1.5" width="61" height="61" rx="7.5"
-        fill="none" stroke="#C4962A" stroke-width="1.2" opacity="0.55"/>
-
-  <!-- Thin top rule -->
-  <line x1="11" y1="15" x2="53" y2="15"
-        stroke="#C4962A" stroke-width="0.9" opacity="0.45"/>
-
-  <!-- JÏT logotype -->
-  <text x="32" y="43"
+  <rect class="bg" width="64" height="64" rx="9"/>
+  <rect class="border" x="1.5" y="1.5" width="61" height="61" rx="7.5"/>
+  <line class="rule" x1="11" y1="15" x2="53" y2="15"/>
+  <text class="txt" x="32" y="43"
         text-anchor="middle"
         font-family="Georgia, 'Times New Roman', Palatino, serif"
-        font-size="28"
-        font-weight="700"
-        fill="#C4962A"
-        letter-spacing="-0.5">J&#207;T</text>
-
-  <!-- Thin bottom rule -->
-  <line x1="11" y1="52" x2="53" y2="52"
-        stroke="#C4962A" stroke-width="0.9" opacity="0.45"/>
+        font-size="28" font-weight="700"
+        letter-spacing="-0.5">JÏT</text>
+  <line class="rule" x1="11" y1="52" x2="53" y2="52"/>
 </svg>
