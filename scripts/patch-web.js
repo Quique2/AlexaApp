@@ -3,8 +3,8 @@
 const fs = require("fs");
 const path = require("path");
 
-const distDir = path.join(__dirname, "..", "dist");
-const assetsDir = path.join(__dirname, "..", "assets");
+const distDir = path.join(__dirname, "..", "app", "dist");
+const assetsDir = path.join(__dirname, "..", "app", "assets");
 
 // ── 1. Copy favicon.svg ───────────────────────────────────────────────────────
 fs.copyFileSync(
