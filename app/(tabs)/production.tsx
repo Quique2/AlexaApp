@@ -560,35 +560,38 @@ function GenerateOrdersModal({ plan, onClose }: { plan: ProductionPlan; onClose:
                     PEDIR ({ordersNeeded.length} materiales)
                   </Text>
                   <View style={[styles.previewList, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    {ordersNeeded.map((item) => {
-                      const alertColor =
-                        item.alertStatus === "CRITICAL" ? colors.red :
-                        item.alertStatus === "RED" ? colors.red :
-                        item.alertStatus === "YELLOW" ? colors.gold :
-                        colors.textSecondary;
-                      const alertLabel =
-                        item.alertStatus === "CRITICAL" ? "⚠ CRÍTICO" :
-                        item.alertStatus === "RED" ? "🔴 URGENTE" :
-                        item.alertStatus === "YELLOW" ? "🟡 CON MARGEN" :
-                        null;
-                      return (
-                        <View key={item.materialId} style={[styles.previewRow, { borderBottomColor: colors.border }]}>
-                          <View style={styles.previewLeft}>
-                            <Text style={[typography.h4, { fontSize: 13 }]}>{item.materialName}</Text>
-                            <Text style={typography.caption}>{item.supplierName ?? "Sin proveedor"} · Stock: {fmt(item.currentStock)}{item.unit}</Text>
-                          </View>
-                          <View style={styles.previewRight}>
-                            <Text style={[typography.bodySmall, { fontWeight: "700", color: alertColor }]}>
-                              {fmt(item.missingQuantity)} {item.unit}
-                            </Text>
-                            <Text style={[typography.caption, { color: colors.textSecondary }]}>{MXN(item.estimatedCost)}</Text>
-                            {alertLabel && (
-                              <Text style={[typography.label, { fontSize: 8, color: alertColor }]}>{alertLabel}</Text>
-                            )}
-                          </View>
-                        </View>
+                    {(() => {
+                      const daysUntilProduction = Math.ceil(
+                        (new Date(plan.productionDate).getTime() - Date.now()) / 86_400_000
                       );
-                    })}
+                      return ordersNeeded.map((item) => {
+                        const alertInfo: { label: string; color: string } | null =
+                          daysUntilProduction < 0
+                            ? { label: "⚠ CRÍTICO", color: colors.red }
+                            : item.actionStatus === "ORDER_NOW"
+                            ? { label: "🔴 URGENTE", color: colors.red }
+                            : item.actionStatus === "ORDER_SOON"
+                            ? { label: "🟡 CON MARGEN", color: colors.gold }
+                            : null;
+                        return (
+                          <View key={item.materialId} style={[styles.previewRow, { borderBottomColor: colors.border }]}>
+                            <View style={styles.previewLeft}>
+                              <Text style={[typography.h4, { fontSize: 13 }]}>{item.materialName}</Text>
+                              <Text style={typography.caption}>{item.supplierName ?? "Sin proveedor"} · Stock: {fmt(item.currentStock)}{item.unit}</Text>
+                            </View>
+                            <View style={styles.previewRight}>
+                              <Text style={[typography.bodySmall, { fontWeight: "700", color: alertInfo?.color ?? colors.textPrimary }]}>
+                                {fmt(item.missingQuantity)} {item.unit}
+                              </Text>
+                              <Text style={[typography.caption, { color: colors.textSecondary }]}>{MXN(item.estimatedCost)}</Text>
+                              {alertInfo && (
+                                <Text style={[typography.label, { fontSize: 8, color: alertInfo.color }]}>{alertInfo.label}</Text>
+                              )}
+                            </View>
+                          </View>
+                        );
+                      });
+                    })()}
                   </View>
                 </>
               )}

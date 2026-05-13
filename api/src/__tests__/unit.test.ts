@@ -108,57 +108,55 @@ test("RECEIVED_PARTIAL  →  null (alert cleared)",
     null
   ));
 
-// ─── Preview modal alert simulation ──────────────────────────────────────────
-// These replicate the logic in the generate-orders endpoint: when no linked
-// order exists yet, simulate placing one today using the supplier lead time.
-console.log("\n🗓️  Preview modal — JIT alert simulation (new-order scenario)");
+// ─── Preview modal badge mapping (actionStatus → display label) ───────────────
+// The generate-orders modal uses actionStatus (already in the API response)
+// to drive badge display. This avoids any simulation and works with any
+// supplier lead time.
+console.log("\n🗓️  Preview modal — actionStatus badge mapping");
 
-function previewAlertStatus(
+import { calculateRequirementStatus } from "../lib/jit";
+
+function previewBadge(
   productionDaysFromNow: number,
   daysToOrder: number,
-  linkedOrder?: { estimatedArrivalDate: Date | null; status: string } | null
-): "CRITICAL" | "RED" | "YELLOW" | null {
-  const productionDate = days(productionDaysFromNow);
-  if (linkedOrder !== undefined) {
-    return computeRequirementAlertStatus(linkedOrder ?? null, productionDate);
-  }
-  // Simulate placing order today with supplier lead time (route logic)
-  const simulatedArrival = new Date(Date.now() + daysToOrder * 86_400_000);
-  return computeRequirementAlertStatus(
-    { estimatedArrivalDate: simulatedArrival, status: "IN_TRANSIT" },
-    productionDate
+  missingQty = 5,
+  incomingQty = 0,
+  bestDelivery: Date | null = null,
+  safetyBuffer = 1
+): "CRÍTICO" | "URGENTE" | "CON MARGEN" | null {
+  // Frontend logic: CRÍTICO only if plan already overdue
+  if (productionDaysFromNow < 0) return "CRÍTICO";
+  const status = calculateRequirementStatus(
+    missingQty, incomingQty, days(productionDaysFromNow), bestDelivery, daysToOrder, safetyBuffer
   );
+  if (status === "ORDER_NOW") return "URGENTE";
+  if (status === "ORDER_SOON") return "CON MARGEN";
+  return null; // OK or COVERED — not in PEDIR list
 }
 
-test("Plan in 84 days, 7-day lead time  →  YELLOW (August-style far plan)",
-  () => assert.strictEqual(previewAlertStatus(84, 7), "YELLOW"));
+test("August plan (84d), 7-day lead time  →  CON MARGEN",
+  () => assert.strictEqual(previewBadge(84, 7), "CON MARGEN"));
 
-test("Plan in 14 days, 7-day lead time  →  YELLOW (exactly 7d buffer)",
-  () => assert.strictEqual(previewAlertStatus(14, 7), "YELLOW"));
+test("August plan (84d), 90-day lead time  →  URGENTE (supplier takes longer than window)",
+  () => assert.strictEqual(previewBadge(84, 90), "URGENTE"));
 
-test("Plan in 13 days, 7-day lead time  →  RED (6d buffer, below threshold)",
-  () => assert.strictEqual(previewAlertStatus(13, 7), "RED"));
+test("Plan in 14d, 7-day lead time  →  CON MARGEN (exactly at threshold: 14 > 7+1)",
+  () => assert.strictEqual(previewBadge(14, 7), "CON MARGEN"));
 
-test("Plan in 10 days, 7-day lead time  →  RED (3d buffer)",
-  () => assert.strictEqual(previewAlertStatus(10, 7), "RED"));
+test("Plan in 9d, 7-day lead time  →  CON MARGEN (9 > 7+1)",
+  () => assert.strictEqual(previewBadge(9, 7), "CON MARGEN"));
 
-test("Plan in 5 days, 7-day lead time  →  CRITICAL (arrives after production)",
-  () => assert.strictEqual(previewAlertStatus(5, 7), "CRITICAL"));
+test("Plan in 7d, 7-day lead time  →  URGENTE (7 ≤ 7+1)",
+  () => assert.strictEqual(previewBadge(7, 7), "URGENTE"));
 
-test("Plan in 30 days, 3-day lead time  →  YELLOW (27d buffer)",
-  () => assert.strictEqual(previewAlertStatus(30, 3), "YELLOW"));
+test("Plan in 3d, 7-day lead time  →  URGENTE",
+  () => assert.strictEqual(previewBadge(3, 7), "URGENTE"));
 
-test("With existing IN_TRANSIT order arriving in 8d, production in 15d  →  YELLOW",
-  () => assert.strictEqual(
-    previewAlertStatus(15, 7, { estimatedArrivalDate: days(8), status: "IN_TRANSIT" }),
-    "YELLOW"
-  ));
+test("Plan already past (-1d)  →  CRÍTICO (overdue)",
+  () => assert.strictEqual(previewBadge(-1, 7), "CRÍTICO"));
 
-test("With existing IN_TRANSIT order arriving in 12d, production in 15d  →  RED (3d buffer)",
-  () => assert.strictEqual(
-    previewAlertStatus(15, 7, { estimatedArrivalDate: days(12), status: "IN_TRANSIT" }),
-    "RED"
-  ));
+test("Plan in 30d, 3-day lead time  →  CON MARGEN",
+  () => assert.strictEqual(previewBadge(30, 3), "CON MARGEN"));
 
 // ─── Summary ──────────────────────────────────────────────────────────────────
 const total = passed + failed;
