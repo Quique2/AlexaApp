@@ -91,8 +91,10 @@ export function useDeleteProductionPlan() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => productionApi.delete(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["production"] });
+    onSuccess: (_, id) => {
+      qc.setQueriesData<ProductionPlan[]>({ queryKey: ["production"] }, (old) =>
+        Array.isArray(old) ? old.filter((p) => p.id !== id) : old
+      );
       qc.invalidateQueries({ queryKey: ["inventory"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
     },

@@ -66,7 +66,11 @@ export default function RecipesScreen() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => recipesApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["recipes", selectedStyle] }),
+    onSuccess: (_, id) => {
+      qc.setQueryData<RecipeLine[]>(["recipes", selectedStyle], (old) =>
+        Array.isArray(old) ? old.filter((l) => l.id !== id) : old
+      );
+    },
   });
 
   const handleDelete = (line: RecipeLine) => setDeleteTarget(line);
