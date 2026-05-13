@@ -6,15 +6,13 @@ import * as XLSX from "xlsx";
 import multer from "multer";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
-import { computeAlertStatus, syncInventoryState } from "../lib/jit";
+import { syncInventoryState } from "../lib/jit";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const UpdateSchema = z.object({
   currentStock: z.number().min(0).optional(),
-  dailyConsumption: z.number().min(0).optional(),
-  reorderPointDays: z.number().int().min(1).optional(),
   notes: z.string().optional().nullable(),
 });
 
@@ -99,20 +97,19 @@ router.get(
       });
 
       const data = [
-        ["id", "nombre", "unidad", "stockActual", "consumoDiario", "notas"],
+        ["id", "nombre", "unidad", "stockActual", "notas"],
         ...rows.map((r) => [
           r.material.id,
           r.material.name,
           r.material.unit,
           r.currentStock,
-          r.dailyConsumption,
           r.notes ?? "",
         ]),
       ];
 
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet(data);
-      ws["!cols"] = [{ wch: 20 }, { wch: 30 }, { wch: 10 }, { wch: 14 }, { wch: 16 }, { wch: 30 }];
+      ws["!cols"] = [{ wch: 20 }, { wch: 30 }, { wch: 10 }, { wch: 14 }, { wch: 30 }];
       XLSX.utils.book_append_sheet(wb, ws, "Inventario");
 
       const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
@@ -156,46 +153,27 @@ router.post(
         }
 
         const stockRaw = parseFloat(row["stockActual"]);
-        const consumoRaw = parseFloat(row["consumoDiario"]);
 
         if (isNaN(stockRaw) || stockRaw < 0) {
           errors.push({ row: rowNum, id, reason: "stockActual inválido" });
           continue;
         }
 
-        const inv = await prisma.inventory.findUnique({
-          where: { materialId: id },
-          include: { material: { include: { supplier: true } } },
-        });
+        const inv = await prisma.inventory.findUnique({ where: { materialId: id } });
 
         if (!inv) {
           errors.push({ row: rowNum, id, reason: "Material no encontrado" });
           continue;
         }
 
-        const newConsumption = isNaN(consumoRaw) ? inv.dailyConsumption : consumoRaw;
-        const newStock = stockRaw;
-        const daysToOrder = inv.material.supplier?.daysToOrder ?? 7;
-        const alertStatus = computeAlertStatus(newStock, newConsumption, inv.reorderPointDays, daysToOrder);
-        const quantityToOrder =
-          newConsumption > 0
-            ? Math.max(0, newConsumption * inv.reorderPointDays - newStock)
-            : 0;
-        const estimatedOrderCost = quantityToOrder * inv.material.unitPrice;
-
         await prisma.inventory.update({
           where: { materialId: id },
           data: {
-            currentStock: newStock,
-            dailyConsumption: newConsumption,
+            currentStock: stockRaw,
             notes: String(row["notas"] ?? "").trim() || inv.notes,
-            alertStatus,
-            quantityToOrder,
-            estimatedOrderCost,
           },
         });
 
-        // Sync JIT state (reservedStock + isCritical) after stock change
         await syncInventoryState(inv.id);
         updated++;
       }
@@ -255,29 +233,15 @@ router.put("/:materialId", requireAuth, async (req: Request, res: Response, next
     const updates = UpdateSchema.parse(req.body);
     const current = await prisma.inventory.findUnique({
       where: { materialId: req.params.materialId },
-      include: { material: { include: { supplier: true } } },
     });
     if (!current) return res.status(404).json({ error: "Not found" });
 
-    const newStock = updates.currentStock ?? current.currentStock;
-    const newConsumption = updates.dailyConsumption ?? current.dailyConsumption;
-    const newReorderDays = updates.reorderPointDays ?? current.reorderPointDays;
-    const daysToOrder = current.material.supplier?.daysToOrder ?? 7;
-
-    const alertStatus = computeAlertStatus(newStock, newConsumption, newReorderDays, daysToOrder);
-    const quantityToOrder =
-      newConsumption > 0
-        ? Math.max(0, newConsumption * newReorderDays - newStock)
-        : 0;
-    const estimatedOrderCost = quantityToOrder * current.material.unitPrice;
-
     const updated = await prisma.inventory.update({
       where: { materialId: req.params.materialId },
-      data: { ...updates, alertStatus, quantityToOrder, estimatedOrderCost },
+      data: updates,
       include: { material: { include: { supplier: true } } },
     });
 
-    // Sync JIT state after stock change
     await syncInventoryState(current.id);
 
     res.json(updated);

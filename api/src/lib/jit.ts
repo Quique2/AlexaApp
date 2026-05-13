@@ -1,19 +1,30 @@
 import prisma from "./prisma";
 import type { AlertStatus, ActionStatus } from "@prisma/client";
 
-// ─── Alert status computation (also used by inventory.ts and receptions.ts) ───
+// ─── Alert status computation (based on order timing vs production date) ─────
 
-export function computeAlertStatus(
-  currentStock: number,
-  dailyConsumption: number,
-  reorderPointDays: number,
-  daysToOrder: number
-): AlertStatus {
-  if (dailyConsumption === 0) return "NONE";
-  const coverage = currentStock / dailyConsumption;
-  if (currentStock === 0 || coverage <= daysToOrder) return "RED";
-  if (coverage <= reorderPointDays) return "YELLOW";
-  return "GREEN";
+/**
+ * Computes the alert status for a single requirement based on its linked order
+ * and the production plan's date.
+ *
+ * CRITICAL  — no order placed, or order arrives after production date
+ * RED       — order arrives less than 7 days before production
+ * YELLOW    — order arrives 7+ days before production
+ */
+function computeRequirementAlertStatus(
+  linkedOrder: { estimatedArrivalDate: Date | null; status: string } | null,
+  productionDate: Date
+): "CRITICAL" | "RED" | "YELLOW" | null {
+  if (!linkedOrder || linkedOrder.status === "CANCELLED") return "CRITICAL";
+  if (["RECEIVED_COMPLETE", "RECEIVED_PARTIAL"].includes(linkedOrder.status)) return null; // delivered, no alert
+  if (!linkedOrder.estimatedArrivalDate) return "CRITICAL";
+
+  const bufferDays =
+    (productionDate.getTime() - new Date(linkedOrder.estimatedArrivalDate).getTime()) / 86_400_000;
+
+  if (bufferDays >= 7) return "YELLOW";
+  if (bufferDays >= 0) return "RED";
+  return "CRITICAL";
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -120,35 +131,44 @@ export function calculateRequirementStatus(
 // ─── Recalculate inventory alert status + isCritical ─────────────────────────
 
 export async function recalculateInventoryAlertStatus(inventoryId: string): Promise<void> {
-  const inv = await prisma.inventory.findUnique({
-    where: { id: inventoryId },
-    include: { material: { include: { supplier: true } } },
-  });
-  if (!inv) return;
-
-  const daysToOrder = inv.material.supplier?.daysToOrder ?? 7;
-  const alertStatus = computeAlertStatus(
-    inv.currentStock,
-    inv.dailyConsumption,
-    inv.reorderPointDays,
-    daysToOrder
-  );
-
-  const criticalCount = await prisma.productionRequirement.count({
+  // Only requirements with missing stock in active signed-off plans trigger alerts
+  const requirements = await prisma.productionRequirement.findMany({
     where: {
       inventoryId,
-      isCritical: true,
+      missingQuantity: { gt: 0 },
       productionPlan: {
-        approvalStatus: "APPROVED",
-        productionStatus: { notIn: ["COMPLETED", "CANCELLED"] },
         signedOffAt: { not: null },
+        productionStatus: { notIn: ["COMPLETED", "CANCELLED"] },
       },
+    },
+    include: {
+      productionPlan: { select: { productionDate: true } },
+      linkedOrder: { select: { estimatedArrivalDate: true, status: true } },
     },
   });
 
+  if (requirements.length === 0) {
+    await prisma.inventory.update({
+      where: { id: inventoryId },
+      data: { alertStatus: "NONE", isCritical: false },
+    });
+    return;
+  }
+
+  const rank: Record<string, number> = { NONE: 0, YELLOW: 1, RED: 2, CRITICAL: 3 };
+  let worst: "NONE" | "YELLOW" | "RED" | "CRITICAL" = "NONE";
+
+  for (const req of requirements) {
+    const status = computeRequirementAlertStatus(
+      req.linkedOrder as any,
+      new Date(req.productionPlan.productionDate)
+    );
+    if (status !== null && rank[status] > rank[worst]) worst = status;
+  }
+
   await prisma.inventory.update({
     where: { id: inventoryId },
-    data: { alertStatus, isCritical: criticalCount > 0 },
+    data: { alertStatus: worst as AlertStatus, isCritical: worst === "CRITICAL" },
   });
 }
 

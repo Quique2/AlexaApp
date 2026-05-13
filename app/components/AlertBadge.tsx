@@ -13,10 +13,11 @@ export function AlertBadge({ status, compact = false }: AlertBadgeProps) {
   const { colors, typography } = useTheme();
 
   const config = useMemo(() => ({
-    RED:    { label: "PEDIR YA",    color: colors.red,    bg: colors.redBg,    emoji: "🔴" },
-    YELLOW: { label: "PEDIR PRONTO", color: colors.yellow, bg: colors.yellowBg, emoji: "🟡" },
-    GREEN:  { label: "OK",          color: colors.green,  bg: colors.greenBg,  emoji: "🟢" },
-    NONE:   { label: "SIN CONSUMO", color: colors.none,   bg: colors.noneBg,   emoji: "—" },
+    CRITICAL: { label: "CRÍTICO",    color: colors.red,    bg: colors.redBg,    emoji: "⚠️" },
+    RED:      { label: "URGENTE",    color: colors.red,    bg: colors.redBg,    emoji: "🔴" },
+    YELLOW:   { label: "CON MARGEN", color: colors.yellow, bg: colors.yellowBg, emoji: "🟡" },
+    GREEN:    { label: "OK",         color: colors.green,  bg: colors.greenBg,  emoji: "🟢" },
+    NONE:     { label: "SIN PLAN",   color: colors.none,   bg: colors.noneBg,   emoji: "—" },
   }), [colors]);
 
   const cfg = config[status];

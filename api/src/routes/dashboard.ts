@@ -59,11 +59,11 @@ router.get("/summary", async (_req: Request, res: Response, next: NextFunction) 
 
     res.json({
       alerts: {
+        critical: alertMap["CRITICAL"] ?? 0,
         red: alertMap["RED"] ?? 0,
         yellow: alertMap["YELLOW"] ?? 0,
         green: alertMap["GREEN"] ?? 0,
         none: alertMap["NONE"] ?? 0,
-        critical: criticalCount,
         ok: reservedCount,
       },
       totalMaterials,

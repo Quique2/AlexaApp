@@ -128,7 +128,7 @@ export default function InventoryScreen() {
           onClose={() => setSelected(null)}
           onSave={(data) => {
             updateMutation.mutate(
-              { materialId: selected.materialId, data },
+              { materialId: selected.materialId, data: { currentStock: data.currentStock, notes: data.notes } },
               { onSuccess: () => setSelected(null) }
             );
           }}
@@ -270,7 +270,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
 interface EditModalProps {
   item: IRow;
   onClose: () => void;
-  onSave: (data: { currentStock: number; dailyConsumption: number; notes?: string }) => void;
+  onSave: (data: { currentStock: number; notes?: string }) => void;
   saving: boolean;
 }
 
@@ -281,16 +281,10 @@ function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
   const canEditPrices = hasRole(["DEVELOPER", "SUPERVISOR"]);
   const mat = item.material!;
   const [stock, setStock] = useState(String(item.currentStock));
-  const [consumption, setConsumption] = useState(String(item.dailyConsumption));
   const [notes, setNotes] = useState(item.notes ?? "");
   const [priceInput, setPriceInput] = useState(mat.unitPrice != null ? String(mat.unitPrice) : "");
   const [priceUnitInput, setPriceUnitInput] = useState(mat.priceUnit ?? "");
   const [savingPrice, setSavingPrice] = useState(false);
-
-  const coverage =
-    parseFloat(consumption) > 0
-      ? Math.round(parseFloat(stock) / parseFloat(consumption))
-      : null;
 
   const handleSave = async () => {
     if (canEditPrices) {
@@ -310,7 +304,6 @@ function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
     }
     onSave({
       currentStock: parseFloat(stock) || 0,
-      dailyConsumption: parseFloat(consumption) || 0,
       notes: notes || undefined,
     });
   };
@@ -334,14 +327,6 @@ function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
           </View>
 
           <ScrollView>
-            {coverage !== null && (
-              <View style={[styles.coveragePill, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={typography.bodySmall}>
-                  Cobertura actual: <Text style={{ color: colors.gold }}>{coverage} días</Text>
-                </Text>
-              </View>
-            )}
-
             {(item.requirements ?? []).length > 0 && (
               <View style={[styles.reservedSection, { backgroundColor: colors.greenBg, borderColor: colors.green + "66" }]}>
                 <Text style={[typography.label, { color: colors.green, marginBottom: spacing.xs }]}>
@@ -368,7 +353,6 @@ function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
 
             <View style={styles.fieldGroup}>
               <Field label={`Stock actual (${mat.unit})`} value={stock} onChangeText={setStock} keyboardType="decimal-pad" colors={colors} typography={typography} />
-              <Field label={`Consumo diario planado (${mat.unit}/día)`} value={consumption} onChangeText={setConsumption} keyboardType="decimal-pad" colors={colors} typography={typography} />
               <Field label="Notas / condición" value={notes} onChangeText={setNotes} multiline colors={colors} typography={typography} />
               {canEditPrices && (
                 <>
@@ -382,13 +366,11 @@ function EditModal({ item, onClose, onSave, saving }: EditModalProps) {
               <View style={styles.infoRow}>
                 <InfoCell label="Precio unit." value={mat.unitPrice != null ? `$${mat.unitPrice}${mat.priceUnit ? "/" + mat.priceUnit : ""}` : "—"} colors={colors} typography={typography} />
                 <InfoCell label="Proveedor" value={mat.supplier?.name?.split(" ")[0] ?? "—"} colors={colors} typography={typography} />
-                <InfoCell label="Reorden" value={`${item.reorderPointDays}d`} colors={colors} typography={typography} />
               </View>
             )}
             {canEditPrices && (
               <View style={styles.infoRow}>
                 <InfoCell label="Proveedor" value={mat.supplier?.name?.split(" ")[0] ?? "—"} colors={colors} typography={typography} />
-                <InfoCell label="Reorden" value={`${item.reorderPointDays}d`} colors={colors} typography={typography} />
               </View>
             )}
 

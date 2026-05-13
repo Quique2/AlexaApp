@@ -27,11 +27,6 @@ export function InventoryRow({ item, onPress }: InventoryRowProps) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const mat = item.material!;
-  const coverage =
-    item.dailyConsumption > 0
-      ? Math.round(item.currentStock / item.dailyConsumption)
-      : null;
-
   const isReserved = (item.reservedStock ?? 0) > 0;
   // Show green badge when reserved for a visto bueno plan, even if alertStatus is NONE
   const badgeStatus = isReserved && item.alertStatus === "NONE" ? "GREEN" : item.alertStatus;
@@ -66,9 +61,6 @@ export function InventoryRow({ item, onPress }: InventoryRowProps) {
         <Text style={[typography.bodySmall, { fontWeight: "600", color: colors.textPrimary }]}>
           {item.currentStock > 0 ? `${fmt(item.currentStock)} ${mat.unit}` : "Sin stock"}
         </Text>
-        {coverage !== null && (
-          <Text style={typography.caption}>{coverage}d cobertura</Text>
-        )}
         {isReserved && (
           <Text style={[typography.caption, { color: colors.green }]}>
             {fmt(item.reservedStock!)} reservado

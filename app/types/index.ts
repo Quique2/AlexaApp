@@ -1,5 +1,5 @@
 export type MaterialType = "LUPULO" | "MALTA" | "YEAST" | "ADJUNTO" | "OTRO";
-export type AlertStatus = "RED" | "YELLOW" | "GREEN" | "NONE";
+export type AlertStatus = "CRITICAL" | "RED" | "YELLOW" | "GREEN" | "NONE";
 export type ActionStatus = "ORDER_NOW" | "ORDER_SOON" | "COVERED" | "OK";
 export type ProductionStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 export type OrderStatus =
@@ -78,12 +78,8 @@ export interface InventoryRow {
   material?: Material;
   currentStock: number;
   reservedStock: number;
-  dailyConsumption: number;
-  reorderPointDays: number;
   alertStatus: AlertStatus;
   isCritical: boolean;
-  quantityToOrder: number;
-  estimatedOrderCost: number;
   notes: string | null;
   updatedAt: string;
   requirements?: ProductionRequirement[];

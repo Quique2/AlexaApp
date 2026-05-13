@@ -100,15 +100,15 @@ export default function OrdersScreen() {
 
   const historyGroups = useMemo(() => {
     if (!allOrders) return [];
-    const items = allOrders.filter(isHistoryOrder);
+    const items = allOrders.filter(o => isHistoryOrder(o) && o.productionPlanId !== null);
     const map = new Map<string, { key: string; title: string; subtitle: string; data: Order[] }>();
     for (const order of items) {
-      const key = order.productionPlanId ?? "__none__";
+      const key = order.productionPlanId!;
       if (!map.has(key)) {
         const plan = order.productionPlan;
         map.set(key, {
           key,
-          title: plan ? plan.style : "Sin plan de producción",
+          title: plan ? plan.style : key,
           subtitle: plan ? formatDateLong(plan.productionDate) : "",
           data: [],
         });

@@ -105,7 +105,7 @@ export const inventoryApi = {
   get: (materialId: string) => request<InventoryRow>(`/inventory/${materialId}`),
   update: (
     materialId: string,
-    data: Partial<{ currentStock: number; dailyConsumption: number; reorderPointDays: number; notes: string }>
+    data: Partial<{ currentStock: number; notes: string }>
   ) =>
     request<InventoryRow>(`/inventory/${materialId}`, { method: "PUT", body: JSON.stringify(data) }),
   downloadTemplate: async (): Promise<Blob> => {

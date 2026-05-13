@@ -86,11 +86,13 @@ export default function DashboardScreen() {
         </Text>
       </View>
 
-      {(s.alerts.red > 0 || s.alerts.yellow > 0) && (
+      {(s.alerts.critical > 0 || s.alerts.red > 0 || s.alerts.yellow > 0) && (
         <Pressable
           style={[
             styles.alertBar,
-            s.alerts.red > 0
+            s.alerts.critical > 0
+              ? { backgroundColor: colors.redBg, borderColor: colors.red }
+              : s.alerts.red > 0
               ? { backgroundColor: colors.redBg, borderColor: colors.red }
               : { backgroundColor: colors.yellowBg, borderColor: colors.yellow },
           ]}
@@ -99,37 +101,28 @@ export default function DashboardScreen() {
           <Text
             style={[
               typography.bodySmall,
-              { fontWeight: "600", flex: 1, color: s.alerts.red > 0 ? colors.red : colors.yellow },
+              { fontWeight: "600", flex: 1, color: s.alerts.critical > 0 || s.alerts.red > 0 ? colors.red : colors.yellow },
             ]}
           >
-            {s.alerts.red > 0
-              ? `🔴 ${s.alerts.red} materiales PEDIR YA · ${s.alerts.yellow} pedir pronto`
-              : `🟡 ${s.alerts.yellow} materiales pedir pronto`}
-            {s.alerts.critical > 0 ? ` · ⚠ ${s.alerts.critical} críticos JIT` : ""}
+            {s.alerts.critical > 0 ? `⚠️ ${s.alerts.critical} CRÍTICO · ` : ""}
+            {s.alerts.red > 0 ? `🔴 ${s.alerts.red} urgente · ` : ""}
+            {s.alerts.yellow > 0 ? `🟡 ${s.alerts.yellow} con margen` : ""}
           </Text>
-          <Text style={[typography.label, { color: s.alerts.red > 0 ? colors.red : colors.yellow }]}>
+          <Text style={[typography.label, { color: s.alerts.critical > 0 || s.alerts.red > 0 ? colors.red : colors.yellow }]}>
             Ver →
           </Text>
         </Pressable>
       )}
 
-      <SectionHeader title="ALERTAS JIT (HOY)" action="Ver inventario" onAction={() => router.push("/inventory")} />
+      <SectionHeader title="ALERTAS DE PEDIDOS" action="Ver inventario" onAction={() => router.push("/inventory")} />
       <View style={styles.kpiRow}>
-        <KPICard label="🔴 PEDIR YA" value={s.alerts.red} sub="materiales críticos" accent="red" onPress={() => router.push("/inventory")} />
-        <KPICard label="🟡 PEDIR PRONTO" value={s.alerts.yellow} sub="materiales con alerta" accent="yellow" onPress={() => router.push("/inventory")} />
-        <KPICard label="🟢 OK" value={s.alerts.ok ?? 0} sub="en visto bueno" accent="green" />
+        <KPICard label="⚠️ CRÍTICO" value={s.alerts.critical} sub="no llega a tiempo" accent="red" onPress={() => router.push("/inventory")} />
+        <KPICard label="🔴 URGENTE" value={s.alerts.red} sub="llega en < 7 días" accent="red" onPress={() => router.push("/inventory")} />
+        <KPICard label="🟡 CON MARGEN" value={s.alerts.yellow} sub="llega 7+ días antes" accent="yellow" onPress={() => router.push("/inventory")} />
       </View>
-      {s.alerts.critical > 0 && (
-        <Pressable
-          style={[styles.criticalBar, { backgroundColor: colors.redBg, borderColor: colors.red }]}
-          onPress={() => router.push("/inventory")}
-        >
-          <Text style={[typography.bodySmall, { fontWeight: "700", color: colors.red, flex: 1 }]}>
-            ⚠ {s.alerts.critical} material{s.alerts.critical > 1 ? "es" : ""} crítico{s.alerts.critical > 1 ? "s" : ""} para producción pendiente
-          </Text>
-          <Text style={[typography.label, { color: colors.red }]}>Ver →</Text>
-        </Pressable>
-      )}
+      <View style={styles.kpiRow}>
+        <KPICard label="🟢 EN VISTO BUENO" value={s.alerts.ok ?? 0} sub="reservados para producción" accent="green" />
+      </View>
 
       <SectionHeader title="PRODUCCIÓN & GASTO" />
       <View style={styles.kpiRow}>

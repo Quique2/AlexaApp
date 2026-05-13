@@ -16,6 +16,7 @@ enum MaterialType {
 }
 
 enum AlertStatus {
+  CRITICAL
   RED
   YELLOW
   GREEN
@@ -132,20 +133,16 @@ model RecipeLine {
 }
 
 model Inventory {
-  id                 String                 @id @default(uuid())
-  materialId         String                 @unique
-  material           Material               @relation(fields: [materialId], references: [id])
-  currentStock       Float                  @default(0)
-  reservedStock      Float                  @default(0)
-  dailyConsumption   Float                  @default(0)
-  reorderPointDays   Int                    @default(7)
-  alertStatus        AlertStatus            @default(NONE)
-  isCritical         Boolean                @default(false)
-  quantityToOrder    Float                  @default(0)
-  estimatedOrderCost Float                  @default(0)
-  notes              String?
-  requirements       ProductionRequirement[]
-  updatedAt          DateTime               @updatedAt
+  id            String                  @id @default(uuid())
+  materialId    String                  @unique
+  material      Material                @relation(fields: [materialId], references: [id])
+  currentStock  Float                   @default(0)
+  reservedStock Float                   @default(0)
+  alertStatus   AlertStatus             @default(NONE)
+  isCritical    Boolean                 @default(false)
+  notes         String?
+  requirements  ProductionRequirement[]
+  updatedAt     DateTime                @updatedAt
 
   @@map("inventory")
 }
