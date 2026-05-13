@@ -23,6 +23,7 @@ const ALERT_FILTERS = [
   { label: "🔴 Pedir ya", value: "RED" },
   { label: "🟡 Pedir pronto", value: "YELLOW" },
   { label: "🟢 OK", value: "GREEN" },
+  { label: "⚠ Crítico", value: "CRITICAL" },
 ];
 const TYPE_FILTERS = [
   { label: "Todos", value: "" },
@@ -67,7 +68,10 @@ export default function InventoryScreen() {
   };
 
   const params = useMemo(
-    () => ({ alert: alertFilter || undefined, type: typeFilter || undefined }),
+    () => ({
+      alert: alertFilter && alertFilter !== "CRITICAL" ? alertFilter : undefined,
+      type: typeFilter || undefined,
+    }),
     [alertFilter, typeFilter]
   );
   const { data, isLoading, refetch, isRefetching } = useInventory(params);
@@ -75,10 +79,14 @@ export default function InventoryScreen() {
 
   const filtered = useMemo(() => {
     if (!data) return [];
-    if (!search) return data;
-    const q = search.toLowerCase();
-    return data.filter((r) => r.material?.name.toLowerCase().includes(q));
-  }, [data, search]);
+    let result = data;
+    if (alertFilter === "CRITICAL") result = result.filter((r) => r.isCritical);
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter((r) => r.material?.name.toLowerCase().includes(q));
+    }
+    return result;
+  }, [data, search, alertFilter]);
 
   const handlePress = useCallback((item: IRow) => setSelected(item), []);
 

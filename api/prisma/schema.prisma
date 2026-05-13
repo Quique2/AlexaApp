@@ -215,7 +215,7 @@ model Order {
   supplierId           String?
   supplier             Supplier?              @relation(fields: [supplierId], references: [id])
   productionPlanId     String?
-  productionPlan       ProductionPlan?        @relation(fields: [productionPlanId], references: [id])
+  productionPlan       ProductionPlan?        @relation(fields: [productionPlanId], references: [id], onDelete: SetNull)
   orderedQuantity      Float
   totalPaid            Float?
   paymentMethod        PaymentMethod?

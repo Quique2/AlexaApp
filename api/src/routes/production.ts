@@ -314,8 +314,12 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response, next: Nex
     const plan = await prisma.productionPlan.findUnique({ where: { id: req.params.id } });
     if (!plan) return res.status(404).json({ error: "Plan not found" });
 
-    // Release reservations before deleting (cascade deletes requirements)
     await releaseReservedStock(req.params.id);
+    // Null out productionPlanId on linked orders so the FK doesn't block deletion
+    await prisma.order.updateMany({
+      where: { productionPlanId: req.params.id },
+      data: { productionPlanId: null },
+    });
     await prisma.productionPlan.delete({ where: { id: req.params.id } });
     res.status(204).send();
   } catch (e) {

@@ -52,12 +52,16 @@ export default function ProductionScreen() {
   const [previewPlan, setPreviewPlan] = useState<ProductionPlan | null>(null);
   const [rejectTarget, setRejectTarget] = useState<ProductionPlan | null>(null);
 
+  const [showHistory, setShowHistory] = useState(false);
+
   const { data: plans, isLoading, refetch, isRefetching } = useProductionPlans();
   const { data: pendingPlans } = usePendingProduction();
   const deleteMutation = useDeleteProductionPlan();
   const approveMutation = useApproveProductionPlan();
 
   const approvedPlans = (plans ?? []).filter((p) => p.approvalStatus === "APPROVED");
+  const activePlans = (plans ?? []).filter((p) => !p.orderedAt);
+  const orderedPlans = (plans ?? []).filter((p) => !!p.orderedAt);
   const weeklyMalt = approvedPlans.reduce((a, p) => a + p.totalMaltKg, 0);
   const weeklyBatches = approvedPlans.reduce((a, p) => a + p.plannedBatches, 0);
 
@@ -67,7 +71,14 @@ export default function ProductionScreen() {
       `¿Eliminar el lote de ${plan.style} del ${formatDate(plan.productionDate)}?`,
       [
         { text: "Cancelar", style: "cancel" },
-        { text: "Eliminar", style: "destructive", onPress: () => deleteMutation.mutate(plan.id) },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: () =>
+            deleteMutation.mutate(plan.id, {
+              onError: (e: any) => Alert.alert("Error al eliminar", e.message),
+            }),
+        },
       ]
     );
   };
@@ -100,7 +111,7 @@ export default function ProductionScreen() {
         <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xl }} />
       ) : (
         <FlatList
-          data={plans}
+          data={showHistory ? orderedPlans : activePlans}
           keyExtractor={(p) => p.id}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.gold} />}
           ListHeaderComponent={() => (
@@ -125,7 +136,16 @@ export default function ProductionScreen() {
                   ))}
                 </View>
               )}
-              <SectionHeader title="PLAN DE PRODUCCIÓN" />
+              <View style={styles.planHeader}>
+                <Text style={[typography.label, { color: colors.textSecondary }]}>PLAN DE PRODUCCIÓN</Text>
+                {orderedPlans.length > 0 && (
+                  <Pressable onPress={() => setShowHistory((v) => !v)} hitSlop={8}>
+                    <Text style={[typography.label, { color: colors.gold }]}>
+                      {showHistory ? "← Activos" : `Historial (${orderedPlans.length})`}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
             </>
           )}
           renderItem={({ item }) => (
@@ -683,6 +703,10 @@ function makeStyles(colors: Colors) {
     },
     pendingHeader: {
       flexDirection: "row", alignItems: "center", gap: spacing.xs, marginBottom: spacing.sm,
+    },
+    planHeader: {
+      flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+      paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.xs,
     },
     pendingDot: { width: 6, height: 6, borderRadius: 3 },
     overlay: { flex: 1, justifyContent: "flex-end" },
