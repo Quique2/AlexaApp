@@ -188,6 +188,8 @@ export const productionApi = {
     ),
   recalculateJIT: (id: string) =>
     request<ProductionPlan>(`/production/${id}/recalculate-jit`, { method: "POST" }),
+  signOff: (id: string) =>
+    request<ProductionPlan>(`/production/${id}/sign-off`, { method: "POST" }),
 };
 
 // ─── Orders ──────────────────────────────────────────────────────────────────

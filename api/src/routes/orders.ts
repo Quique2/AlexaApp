@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { OrderStatus, PaymentMethod } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { z } from "zod";
-import { syncInventoryState } from "../lib/jit";
+import { syncInventoryState, checkAndAutoSignOffPlan } from "../lib/jit";
 
 const router = Router();
 
@@ -220,6 +220,11 @@ router.patch("/:id/confirm-received", async (req: Request, res: Response, next: 
         data: { currentStock: { increment: receivedQuantity } },
       });
       await syncInventoryState(inventory.id);
+    }
+
+    // Auto sign-off the plan if all its orders are now fully received
+    if (order.productionPlanId) {
+      await checkAndAutoSignOffPlan(order.productionPlanId);
     }
 
     res.json({ reception, orderStatus: newStatus, totalReceived });

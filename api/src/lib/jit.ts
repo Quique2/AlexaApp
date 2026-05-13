@@ -68,6 +68,7 @@ export async function recalculateReservedStock(inventoryId: string): Promise<voi
       productionPlan: {
         approvalStatus: "APPROVED",
         productionStatus: { notIn: ["COMPLETED", "CANCELLED"] },
+        signedOffAt: { not: null },
       },
     },
     _sum: { reservedQuantity: true },
@@ -140,6 +141,7 @@ export async function recalculateInventoryAlertStatus(inventoryId: string): Prom
       productionPlan: {
         approvalStatus: "APPROVED",
         productionStatus: { notIn: ["COMPLETED", "CANCELLED"] },
+        signedOffAt: { not: null },
       },
     },
   });
@@ -182,7 +184,7 @@ export async function calculateProductionRequirements(planId: string): Promise<v
     const requiredQuantity = line.qtyPerBatch * plan.plannedBatches;
     const incomingQty = await calculateIncomingQuantity(material.id);
 
-    // Reservations from other active plans (exclude this plan's own reservation)
+    // Reservations from other signed-off plans (exclude this plan's own reservation)
     const otherRes = await prisma.productionRequirement.aggregate({
       where: {
         inventoryId: inventory.id,
@@ -190,6 +192,7 @@ export async function calculateProductionRequirements(planId: string): Promise<v
         productionPlan: {
           approvalStatus: "APPROVED",
           productionStatus: { notIn: ["COMPLETED", "CANCELLED"] },
+          signedOffAt: { not: null },
         },
       },
       _sum: { reservedQuantity: true },
@@ -316,6 +319,37 @@ export async function releaseReservedStock(planId: string): Promise<void> {
   }
 }
 
+// ─── Auto sign-off when all plan orders are received ─────────────────────────
+
+/**
+ * Called after every reception. If the plan has had orders placed (orderedAt set)
+ * and ALL of those orders are now RECEIVED_COMPLETE, auto-set signedOffAt and
+ * reserve the stock so inventory state is accurate.
+ */
+export async function checkAndAutoSignOffPlan(planId: string): Promise<void> {
+  const plan = await prisma.productionPlan.findUnique({
+    where: { id: planId },
+    select: { id: true, signedOffAt: true, approvalStatus: true, orderedAt: true },
+  });
+  if (!plan || plan.signedOffAt || plan.approvalStatus !== "APPROVED" || !plan.orderedAt) return;
+
+  const orders = await prisma.order.findMany({
+    where: { productionPlanId: planId },
+    select: { status: true },
+  });
+
+  if (orders.length === 0) return;
+  const allReceived = orders.every((o) => o.status === "RECEIVED_COMPLETE");
+  if (!allReceived) return;
+
+  await prisma.productionPlan.update({
+    where: { id: planId },
+    data: { signedOffAt: new Date() },
+  });
+
+  await reserveStockForPlan(planId);
+}
+
 // ─── Consume stock when a plan is executed (COMPLETED) ───────────────────────
 
 /**
@@ -405,6 +439,7 @@ export async function analyzeProductionRequirements(
         productionPlan: {
           approvalStatus: "APPROVED",
           productionStatus: { notIn: ["COMPLETED", "CANCELLED"] },
+          signedOffAt: { not: null },
         },
       },
       _sum: { reservedQuantity: true },

@@ -13,6 +13,7 @@ import {
   analyzeProductionRequirements,
   recalculateReservedStock,
   recalculateInventoryAlertStatus,
+  checkAndAutoSignOffPlan,
 } from "../lib/jit";
 
 const router = Router();
@@ -54,6 +55,7 @@ async function autoCompletePastPlans(): Promise<void> {
     where: {
       approvalStatus: "APPROVED",
       productionStatus: "PENDING",
+      signedOffAt: { not: null },
       productionDate: { lt: startOfToday },
     },
     select: { id: true },
@@ -260,6 +262,43 @@ router.post(
           rejectionReason: reason ?? null,
         },
       });
+      res.json(updated);
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+// POST /api/production/:id/sign-off — visto bueno for all-OK plans
+router.post(
+  "/:id/sign-off",
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const plan = await prisma.productionPlan.findUnique({
+        where: { id: req.params.id },
+        include: { requirements: true },
+      });
+      if (!plan) return res.status(404).json({ error: "Plan not found" });
+      if (plan.signedOffAt) return res.status(409).json({ error: "Este plan ya tiene visto bueno" });
+      if (plan.approvalStatus !== "APPROVED") {
+        return res.status(422).json({ error: "Solo planes aprobados pueden recibir visto bueno" });
+      }
+
+      const hasMissing = plan.requirements.some((r) => r.missingQuantity > 0);
+      if (hasMissing) {
+        return res.status(422).json({
+          error: "Hay materiales faltantes. Genera los pedidos primero.",
+        });
+      }
+
+      const updated = await prisma.productionPlan.update({
+        where: { id: req.params.id },
+        data: { signedOffAt: new Date(), orderedAt: plan.orderedAt ?? new Date() },
+      });
+
+      await reserveStockForPlan(plan.id);
+
       res.json(updated);
     } catch (e) {
       next(e);

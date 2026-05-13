@@ -19,6 +19,7 @@ import {
   useDeleteProductionPlan,
   useApproveProductionPlan,
   useRejectProductionPlan,
+  useSignOffProductionPlan,
 } from "../hooks/useProduction";
 import { recipesApi } from "../services/api";
 import type { ProductionPlan, GenerateOrdersPreview } from "../types";
@@ -42,6 +43,11 @@ function daysFromNow(iso: string) {
   return `en ${diff}d`;
 }
 
+function allRequirementsOk(plan: ProductionPlan): boolean {
+  if (!plan.requirements || plan.requirements.length === 0) return false;
+  return plan.requirements.every((r) => r.missingQuantity === 0);
+}
+
 export default function ProductionScreen() {
   const { colors, typography } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -63,13 +69,15 @@ export default function ProductionScreen() {
   const approveMutation = useApproveProductionPlan();
 
   const approvedPlans = (plans ?? []).filter((p) => p.approvalStatus === "APPROVED");
-  const activePlans = (plans ?? []).filter((p) => !p.orderedAt);
-  const orderedPlans = (plans ?? []).filter((p) => !!p.orderedAt);
+  // Active: not yet signed off
+  const activePlans = (plans ?? []).filter((p) => !p.signedOffAt);
+  // Historial: signed off
+  const signedOffPlans = (plans ?? []).filter((p) => !!p.signedOffAt);
+
   const weeklyMalt = approvedPlans.reduce((a, p) => a + p.totalMaltKg, 0);
   const weeklyBatches = approvedPlans.reduce((a, p) => a + p.plannedBatches, 0);
 
   const handleDelete = (plan: ProductionPlan) => setDeleteTarget(plan);
-
   const handleApprove = (plan: ProductionPlan) => setApproveTarget(plan);
 
   return (
@@ -84,7 +92,7 @@ export default function ProductionScreen() {
         <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xl }} />
       ) : (
         <FlatList
-          data={showHistory ? orderedPlans : activePlans}
+          data={showHistory ? signedOffPlans : activePlans}
           keyExtractor={(p) => p.id}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.gold} />}
           ListHeaderComponent={() => (
@@ -111,10 +119,10 @@ export default function ProductionScreen() {
               )}
               <View style={styles.planHeader}>
                 <Text style={[typography.label, { color: colors.textSecondary }]}>PLAN DE PRODUCCIÓN</Text>
-                {orderedPlans.length > 0 && (
+                {signedOffPlans.length > 0 && (
                   <Pressable onPress={() => setShowHistory((v) => !v)} hitSlop={8}>
                     <Text style={[typography.label, { color: colors.gold }]}>
-                      {showHistory ? "← Activos" : `Historial (${orderedPlans.length})`}
+                      {showHistory ? "← Activos" : `Historial (${signedOffPlans.length})`}
                     </Text>
                   </Pressable>
                 )}
@@ -126,7 +134,7 @@ export default function ProductionScreen() {
               plan={item}
               canApprove={canApprove}
               onDelete={showHistory ? undefined : handleDelete}
-              onGenerateOrders={() => setPreviewPlan(item)}
+              onOpenModal={() => setPreviewPlan(item)}
               onApprove={() => handleApprove(item)}
               onReject={() => setRejectTarget(item)}
             />
@@ -145,7 +153,12 @@ export default function ProductionScreen() {
       </Pressable>
 
       {showForm && <PlanForm onClose={() => setShowForm(false)} />}
-      {previewPlan && <GenerateOrdersModal plan={previewPlan} onClose={() => setPreviewPlan(null)} />}
+      {previewPlan && (
+        <GenerateOrdersModal
+          plan={previewPlan}
+          onClose={() => setPreviewPlan(null)}
+        />
+      )}
       {rejectTarget && (
         <RejectModal plan={rejectTarget} onClose={() => setRejectTarget(null)} />
       )}
@@ -246,23 +259,26 @@ const pendingStyles = StyleSheet.create({
 });
 
 function PlanCard({
-  plan, canApprove, onDelete, onGenerateOrders, onApprove, onReject,
+  plan, canApprove, onDelete, onOpenModal, onApprove, onReject,
 }: {
   plan: ProductionPlan; canApprove: boolean;
   onDelete?: (p: ProductionPlan) => void;
-  onGenerateOrders: () => void;
+  onOpenModal: () => void;
   onApprove: () => void;
   onReject: () => void;
 }) {
   const { colors, typography } = useTheme();
   const days = daysFromNow(plan.productionDate);
   const isToday = days === "HOY" || days === "MAÑANA";
-  const isOrdered = !!plan.orderedAt;
+  const isSignedOff = !!plan.signedOffAt;
+  const ordersInProgress = !!plan.orderedAt && !plan.signedOffAt;
   const isPending = plan.approvalStatus === "PENDING";
   const isRejected = plan.approvalStatus === "REJECTED";
   const isCompleted = plan.productionStatus === "COMPLETED";
   const isCancelledProd = plan.productionStatus === "CANCELLED";
   const isInProgress = plan.productionStatus === "IN_PROGRESS";
+  const canAct = plan.approvalStatus === "APPROVED" && !isSignedOff && !ordersInProgress;
+  const allOk = allRequirementsOk(plan);
 
   return (
     <View style={[planCardStyles.card, { borderBottomColor: colors.border }, isToday && !isPending && { backgroundColor: colors.surface }]}>
@@ -273,7 +289,7 @@ function PlanCard({
           <Text style={typography.caption}>{formatDate(plan.productionDate)}</Text>
           {isPending && (
             <View style={[planCardStyles.statusBadge, { backgroundColor: colors.gold + "22", borderColor: colors.gold + "55" }]}>
-              <Text style={[typography.label, { fontSize: 8, color: colors.gold }]}>PENDIENTE</Text>
+              <Text style={[typography.label, { fontSize: 8, color: colors.gold }]}>PENDIENTE APROBACIÓN</Text>
             </View>
           )}
           {isRejected && (
@@ -323,14 +339,32 @@ function PlanCard({
                 <Ionicons name="close" size={12} color={colors.textMuted} />
               </Pressable>
             </>
-          ) : isOrdered ? (
-            <View style={[planCardStyles.orderedBadge, { backgroundColor: colors.greenBg, borderColor: colors.green }]}>
+          ) : isSignedOff ? (
+            <View style={[planCardStyles.signedBadge, { backgroundColor: colors.greenBg, borderColor: colors.green }]}>
               <Ionicons name="checkmark-circle" size={12} color={colors.green} />
-              <Text style={[typography.label, { fontSize: 8, color: colors.green }]}>PEDIDO</Text>
+              <Text style={[typography.label, { fontSize: 8, color: colors.green }]}>VISTO BUENO</Text>
             </View>
-          ) : plan.approvalStatus === "APPROVED" ? (
-            <Pressable onPress={onGenerateOrders} hitSlop={8} style={[planCardStyles.orderBtn, { borderColor: colors.goldDim }]}>
-              <Ionicons name="cart-outline" size={14} color={colors.gold} />
+          ) : ordersInProgress ? (
+            <View style={[planCardStyles.waitingBadge, { backgroundColor: colors.goldDim + "22", borderColor: colors.goldDim }]}>
+              <Ionicons name="time-outline" size={11} color={colors.gold} />
+              <Text style={[typography.label, { fontSize: 8, color: colors.gold }]}>EN ESPERA</Text>
+            </View>
+          ) : canAct ? (
+            <Pressable
+              onPress={onOpenModal}
+              hitSlop={8}
+              style={[
+                planCardStyles.actionBtn,
+                allOk
+                  ? { borderColor: colors.green, backgroundColor: colors.greenBg }
+                  : { borderColor: colors.goldDim },
+              ]}
+            >
+              <Ionicons
+                name={allOk ? "checkmark-circle-outline" : "cart-outline"}
+                size={14}
+                color={allOk ? colors.green : colors.gold}
+              />
             </Pressable>
           ) : null}
           {onDelete && (
@@ -355,9 +389,12 @@ const planCardStyles = StyleSheet.create({
   mid: { alignItems: "flex-end", marginRight: spacing.sm },
   right: { alignItems: "flex-end", gap: spacing.xs },
   actions: { flexDirection: "row", gap: spacing.xs, alignItems: "center" },
-  orderBtn: { padding: 4, borderRadius: radius.sm, borderWidth: 1 },
   actionBtn: { padding: 4, borderRadius: radius.sm, borderWidth: 1 },
-  orderedBadge: {
+  signedBadge: {
+    flexDirection: "row", alignItems: "center", gap: 3,
+    paddingHorizontal: 6, paddingVertical: 3, borderRadius: radius.sm, borderWidth: 1,
+  },
+  waitingBadge: {
     flexDirection: "row", alignItems: "center", gap: 3,
     paddingHorizontal: 6, paddingVertical: 3, borderRadius: radius.sm, borderWidth: 1,
   },
@@ -441,6 +478,7 @@ function GenerateOrdersModal({ plan, onClose }: { plan: ProductionPlan; onClose:
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const qc = useQueryClient();
+  const signOffMutation = useSignOffProductionPlan();
 
   React.useEffect(() => {
     recipesApi.previewOrders(plan.id)
@@ -449,7 +487,7 @@ function GenerateOrdersModal({ plan, onClose }: { plan: ProductionPlan; onClose:
       .finally(() => setLoading(false));
   }, [plan.id]);
 
-  const handleConfirm = async () => {
+  const handleConfirmOrders = async () => {
     setConfirming(true);
     try {
       const result = await recipesApi.confirmOrders(plan.id);
@@ -458,7 +496,7 @@ function GenerateOrdersModal({ plan, onClose }: { plan: ProductionPlan; onClose:
       qc.invalidateQueries({ queryKey: ["production"] });
       Alert.alert(
         "Pedidos generados",
-        `${result.created.length} pedido(s) creado(s). ${result.skipped} material(es) con stock suficiente.`,
+        `${result.created.length} pedido(s) creado(s). Recibirás el visto bueno automáticamente cuando lleguen.`,
         [{ text: "Ver pedidos", onPress: onClose }]
       );
     } catch (e: any) {
@@ -466,6 +504,13 @@ function GenerateOrdersModal({ plan, onClose }: { plan: ProductionPlan; onClose:
     } finally {
       setConfirming(false);
     }
+  };
+
+  const handleSignOff = () => {
+    signOffMutation.mutate(plan.id, {
+      onSuccess: () => onClose(),
+      onError: (e: any) => Alert.alert("Error", e.message),
+    });
   };
 
   const ordersNeeded = preview?.preview.filter((p) => p.willOrder) ?? [];
@@ -556,15 +601,35 @@ function GenerateOrdersModal({ plan, onClose }: { plan: ProductionPlan; onClose:
               </View>
 
               {ordersNeeded.length === 0 ? (
-                <View style={[styles.allGoodBox, { backgroundColor: colors.greenBg, borderColor: colors.green }]}>
-                  <Text style={[typography.bodySmall, { color: colors.green, fontWeight: "600" }]}>
-                    Stock suficiente para todos los ingredientes
-                  </Text>
-                </View>
+                <>
+                  <View style={[styles.allGoodBox, { backgroundColor: colors.greenBg, borderColor: colors.green }]}>
+                    <Ionicons name="checkmark-circle" size={20} color={colors.green} />
+                    <Text style={[typography.bodySmall, { color: colors.green, fontWeight: "600", marginTop: 4 }]}>
+                      Stock suficiente para todos los ingredientes
+                    </Text>
+                    <Text style={[typography.caption, { color: colors.green, marginTop: 2, textAlign: "center" }]}>
+                      Da el visto bueno para reservar el stock y programar la producción.
+                    </Text>
+                  </View>
+                  <Pressable
+                    style={[styles.confirmBtn, { backgroundColor: colors.green }, signOffMutation.isPending && { opacity: 0.6 }]}
+                    onPress={handleSignOff}
+                    disabled={signOffMutation.isPending}
+                  >
+                    {signOffMutation.isPending ? (
+                      <ActivityIndicator color={colors.bg} />
+                    ) : (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
+                        <Ionicons name="checkmark-circle-outline" size={18} color={colors.bg} />
+                        <Text style={[typography.h4, { color: colors.bg }]}>Dar visto bueno</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                </>
               ) : (
                 <Pressable
                   style={[styles.confirmBtn, { backgroundColor: colors.gold }, confirming && { opacity: 0.6 }]}
-                  onPress={handleConfirm}
+                  onPress={handleConfirmOrders}
                   disabled={confirming}
                 >
                   {confirming
@@ -741,7 +806,10 @@ function makeStyles(colors: Colors) {
       flexDirection: "row", justifyContent: "space-between", alignItems: "center",
       marginTop: spacing.md, paddingVertical: spacing.sm, borderTopWidth: 1,
     },
-    allGoodBox: { borderRadius: radius.md, borderWidth: 1, padding: spacing.md, marginTop: spacing.md, alignItems: "center" },
+    allGoodBox: {
+      borderRadius: radius.md, borderWidth: 1, padding: spacing.md,
+      marginTop: spacing.md, alignItems: "center",
+    },
     confirmBtn: { borderRadius: radius.md, paddingVertical: spacing.md, alignItems: "center", marginTop: spacing.lg },
     formContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.xxl },
     styleChip: {

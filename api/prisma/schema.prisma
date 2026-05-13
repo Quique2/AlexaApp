@@ -163,6 +163,7 @@ model ProductionPlan {
   totalYeastG      Float                  @default(0)
   notes            String?
   orderedAt        DateTime?
+  signedOffAt      DateTime?
   approvalStatus   ApprovalStatus         @default(PENDING)
   productionStatus ProductionStatus       @default(PENDING)
   approvedById     String?

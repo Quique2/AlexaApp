@@ -101,6 +101,18 @@ export function useDeleteProductionPlan() {
   });
 }
 
+export function useSignOffProductionPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => productionApi.signOff(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["production"] });
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
 export function useJITAnalysis(planId: string | null) {
   return useQuery({
     queryKey: ["production", planId, "jit-analysis"],

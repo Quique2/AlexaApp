@@ -101,6 +101,7 @@ export interface ProductionPlan {
   totalYeastG: number;
   notes: string | null;
   orderedAt: string | null;
+  signedOffAt: string | null;
   approvalStatus: ApprovalStatus;
   productionStatus: ProductionStatus;
   approvedById: string | null;
