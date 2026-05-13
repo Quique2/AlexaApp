@@ -15,6 +15,7 @@ import {
   recalculateInventoryAlertStatus,
   checkAndAutoSignOffPlan,
   roundQty,
+  computeRequirementAlertStatus,
 } from "../lib/jit";
 
 const router = Router();
@@ -517,29 +518,52 @@ router.post(
         include: {
           material: { include: { supplier: true } },
           inventory: true,
+          linkedOrder: { select: { estimatedArrivalDate: true, status: true } },
         },
       });
 
       const now = new Date();
       const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-      const preview = requirements.map((req) => ({
-        materialId: req.materialId,
-        materialName: req.material.name,
-        unit: req.material.unit,
-        requiredQuantity: req.requiredQuantity,
-        currentStock: req.inventory.currentStock,
-        reservedByOthers:
-          (req.inventory.reservedStock ?? 0) - req.reservedQuantity,
-        incomingQuantity: 0, // populated client-side from analysis if needed
-        missingQuantity: req.missingQuantity,
-        isCritical: req.isCritical,
-        actionStatus: req.actionStatus,
-        supplierId: req.material.supplierId,
-        supplierName: req.material.supplier?.name ?? null,
-        estimatedCost: req.missingQuantity * (req.material.unitPrice ?? 0),
-        willOrder: req.missingQuantity > 0,
-      }));
+      const preview = requirements.map((req) => {
+        const daysToOrder = req.material.supplier?.daysToOrder ?? 7;
+
+        // Compute JIT timing status for this item:
+        // - missingQuantity = 0 → no alert needed
+        // - linked order exists → use its actual arrival date
+        // - no linked order yet → simulate placing one today with supplier lead time
+        let alertStatus: "CRITICAL" | "RED" | "YELLOW" | null = null;
+        if (req.missingQuantity > 0) {
+          if (req.linkedOrder) {
+            alertStatus = computeRequirementAlertStatus(req.linkedOrder as any, plan.productionDate);
+          } else {
+            const simulatedArrival = new Date(now);
+            simulatedArrival.setDate(simulatedArrival.getDate() + daysToOrder);
+            alertStatus = computeRequirementAlertStatus(
+              { estimatedArrivalDate: simulatedArrival, status: "IN_TRANSIT" },
+              plan.productionDate
+            );
+          }
+        }
+
+        return {
+          materialId: req.materialId,
+          materialName: req.material.name,
+          unit: req.material.unit,
+          requiredQuantity: req.requiredQuantity,
+          currentStock: req.inventory.currentStock,
+          reservedByOthers: (req.inventory.reservedStock ?? 0) - req.reservedQuantity,
+          incomingQuantity: 0,
+          missingQuantity: req.missingQuantity,
+          isCritical: req.isCritical,
+          alertStatus,
+          actionStatus: req.actionStatus,
+          supplierId: req.material.supplierId,
+          supplierName: req.material.supplier?.name ?? null,
+          estimatedCost: req.missingQuantity * (req.material.unitPrice ?? 0),
+          willOrder: req.missingQuantity > 0,
+        };
+      });
 
       const totalEstimatedCost = preview.reduce((a, p) => a + p.estimatedCost, 0);
 

@@ -168,6 +168,7 @@ export interface OrderPreviewItem {
   incomingQuantity: number;
   missingQuantity: number;
   isCritical: boolean;
+  alertStatus: AlertStatus | null;
   actionStatus: ActionStatus;
   supplierId: string | null;
   supplierName: string | null;
