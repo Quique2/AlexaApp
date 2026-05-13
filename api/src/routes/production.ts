@@ -9,7 +9,10 @@ import {
   calculateProductionRequirements,
   reserveStockForPlan,
   releaseReservedStock,
+  consumeStockForPlan,
   analyzeProductionRequirements,
+  recalculateReservedStock,
+  recalculateInventoryAlertStatus,
 } from "../lib/jit";
 
 const router = Router();
@@ -41,9 +44,34 @@ async function computePlanCost(style: string, batches: number) {
   return { estimatedCost, hasMissingPrices };
 }
 
+// ─── Auto-consume helper ─────────────────────────────────────────────────────
+
+async function autoCompletePastPlans(): Promise<void> {
+  const startOfToday = new Date();
+  startOfToday.setUTCHours(0, 0, 0, 0);
+
+  const overdue = await prisma.productionPlan.findMany({
+    where: {
+      approvalStatus: "APPROVED",
+      productionStatus: "PENDING",
+      productionDate: { lt: startOfToday },
+    },
+    select: { id: true },
+  });
+
+  for (const { id } of overdue) {
+    await consumeStockForPlan(id);
+    await prisma.productionPlan.update({
+      where: { id },
+      data: { productionStatus: "COMPLETED" },
+    });
+  }
+}
+
 // GET /api/production
 router.get("/", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    await autoCompletePastPlans();
     const { from, to, style, productionStatus } = req.query;
     const plans = await prisma.productionPlan.findMany({
       where: {
@@ -89,11 +117,11 @@ router.get(
 router.get("/upcoming", requireAuth, async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const now = new Date();
-    const in7 = new Date(now);
-    in7.setDate(in7.getDate() + 7);
+    const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const in7 = new Date(startOfToday.getTime() + 7 * 86_400_000);
     const plans = await prisma.productionPlan.findMany({
       where: {
-        productionDate: { gte: now, lte: in7 },
+        productionDate: { gte: startOfToday, lte: in7 },
         productionStatus: { notIn: ["COMPLETED", "CANCELLED"] },
       },
       include: {
@@ -258,8 +286,9 @@ router.patch(
         data: { productionStatus: productionStatus as any },
       });
 
-      // Release stock reservations when execution is finished
-      if (productionStatus === "COMPLETED" || productionStatus === "CANCELLED") {
+      if (productionStatus === "COMPLETED") {
+        await consumeStockForPlan(plan.id);
+      } else if (productionStatus === "CANCELLED") {
         await releaseReservedStock(plan.id);
       }
 
@@ -314,13 +343,29 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response, next: Nex
     const plan = await prisma.productionPlan.findUnique({ where: { id: req.params.id } });
     if (!plan) return res.status(404).json({ error: "Plan not found" });
 
-    await releaseReservedStock(req.params.id);
-    // Null out productionPlanId on linked orders so the FK doesn't block deletion
+    // Collect affected inventory IDs before deletion so we can recalculate after
+    const requirements = await prisma.productionRequirement.findMany({
+      where: { productionPlanId: req.params.id },
+      select: { inventoryId: true },
+    });
+    const inventoryIds = [...new Set(requirements.map((r) => r.inventoryId))];
+
+    // Null out orders to avoid FK violation
     await prisma.order.updateMany({
       where: { productionPlanId: req.params.id },
       data: { productionPlanId: null },
     });
+
+    // Delete plan — ProductionRequirement rows cascade-delete here
     await prisma.productionPlan.delete({ where: { id: req.params.id } });
+
+    // Recalculate AFTER deletion: requirements are gone, so isCritical/reservedStock
+    // will correctly reflect the absence of this plan
+    for (const inventoryId of inventoryIds) {
+      await recalculateReservedStock(inventoryId);
+      await recalculateInventoryAlertStatus(inventoryId);
+    }
+
     res.status(204).send();
   } catch (e) {
     next(e);

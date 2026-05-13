@@ -7,8 +7,10 @@ const router = Router();
 router.get("/summary", async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const now = new Date();
-    const in7 = new Date(now);
-    in7.setDate(in7.getDate() + 7);
+    // Use start-of-today (UTC) so plans scheduled for today aren't missed due to
+    // timezone offsets between the server and where production dates are stored
+    const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const in7 = new Date(startOfToday.getTime() + 7 * 86_400_000);
 
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
@@ -23,7 +25,7 @@ router.get("/summary", async (_req: Request, res: Response, next: NextFunction) 
         prisma.material.count(),
         prisma.productionPlan.findMany({
           where: {
-            productionDate: { gte: now, lte: in7 },
+            productionDate: { gte: startOfToday, lte: in7 },
             productionStatus: { notIn: ["COMPLETED", "CANCELLED"] },
           },
           include: {

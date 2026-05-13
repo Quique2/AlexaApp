@@ -316,6 +316,33 @@ export async function releaseReservedStock(planId: string): Promise<void> {
   }
 }
 
+// ─── Consume stock when a plan is executed (COMPLETED) ───────────────────────
+
+/**
+ * Deducts each requirement's reservedQuantity from currentStock, then releases
+ * the reservation. Call when a plan transitions to COMPLETED so that the
+ * physical consumption is reflected in inventory.
+ */
+export async function consumeStockForPlan(planId: string): Promise<void> {
+  const requirements = await prisma.productionRequirement.findMany({
+    where: { productionPlanId: planId },
+    select: { inventoryId: true, reservedQuantity: true },
+  });
+
+  for (const req of requirements) {
+    const toDeduct = req.reservedQuantity;
+    if (toDeduct > 0) {
+      await prisma.inventory.update({
+        where: { id: req.inventoryId },
+        data: { currentStock: { decrement: toDeduct } },
+      });
+    }
+  }
+
+  // Zero out reservations and recalculate alert status
+  await releaseReservedStock(planId);
+}
+
 // ─── Full sync for a single inventory item ────────────────────────────────────
 
 /**
