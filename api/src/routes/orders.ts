@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { OrderStatus, PaymentMethod } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { z } from "zod";
-import { syncInventoryState, checkAndAutoSignOffPlan } from "../lib/jit";
+import { syncInventoryState, checkAndAutoSignOffPlan, recalculateInventoryAlertStatus } from "../lib/jit";
 
 const router = Router();
 
@@ -148,8 +148,12 @@ router.put("/:id", async (req: Request, res: Response, next: NextFunction) => {
     const order = await prisma.order.update({
       where: { id: req.params.id },
       data,
-      include: { material: true, supplier: true },
+      include: { material: { include: { inventory: true } }, supplier: true },
     });
+    // Any change to an order (status, arrival date, etc.) may shift the JIT alert
+    if (order.material.inventory) {
+      await recalculateInventoryAlertStatus(order.material.inventory.id);
+    }
     res.json(order);
   } catch (e) {
     next(e);

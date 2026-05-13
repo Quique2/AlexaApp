@@ -571,7 +571,7 @@ router.post(
             productionPlanId: plan.id,
             orderedQuantity: roundQty(p.missingQuantity),
             estimatedArrivalDate: arrival,
-            status: "PENDING",
+            status: "IN_TRANSIT",
             month,
             notes: `Auto-generado para ${plan.style} · ${plan.plannedBatches} lote(s) · ${now.toLocaleDateString("es-MX")}`,
           },

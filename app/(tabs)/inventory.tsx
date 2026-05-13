@@ -20,11 +20,11 @@ import { fmt } from "../utils/fmt";
 import type { InventoryRow as IRow, MaterialType } from "../types";
 
 const ALERT_FILTERS = [
-  { label: "Todos", value: "" },
-  { label: "🔴 Pedir ya", value: "RED" },
-  { label: "🟡 Pedir pronto", value: "YELLOW" },
-  { label: "🟢 OK", value: "OK_RESERVED" },
-  { label: "⚠ Crítico", value: "CRITICAL" },
+  { label: "Todos",        value: "" },
+  { label: "⚠️ Crítico",   value: "CRITICAL" },
+  { label: "🔴 Urgente",   value: "RED" },
+  { label: "🟡 Con margen", value: "YELLOW" },
+  { label: "🟢 OK",        value: "OK_RESERVED" },
 ];
 const TYPE_FILTERS = [
   { label: "Todos", value: "" },

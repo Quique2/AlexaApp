@@ -16,7 +16,7 @@ export function roundQty(n: number): number {
  * RED       — order arrives less than 7 days before production
  * YELLOW    — order arrives 7+ days before production
  */
-function computeRequirementAlertStatus(
+export function computeRequirementAlertStatus(
   linkedOrder: { estimatedArrivalDate: Date | null; status: string } | null,
   productionDate: Date
 ): "CRITICAL" | "RED" | "YELLOW" | null {
@@ -136,13 +136,15 @@ export function calculateRequirementStatus(
 // ─── Recalculate inventory alert status + isCritical ─────────────────────────
 
 export async function recalculateInventoryAlertStatus(inventoryId: string): Promise<void> {
-  // Only requirements with missing stock in active signed-off plans trigger alerts
+  // Alerts fire as soon as orders are placed (orderedAt set) — not gated on sign-off.
+  // Stock reservation is still gated on signedOffAt (in recalculateReservedStock).
   const requirements = await prisma.productionRequirement.findMany({
     where: {
       inventoryId,
       missingQuantity: { gt: 0 },
       productionPlan: {
-        signedOffAt: { not: null },
+        orderedAt: { not: null },
+        approvalStatus: "APPROVED",
         productionStatus: { notIn: ["COMPLETED", "CANCELLED"] },
       },
     },
