@@ -16,18 +16,20 @@ fs.copyFileSync(
 const indexPath = path.join(distDir, "index.html");
 let html = fs.readFileSync(indexPath, "utf8");
 
-// Version stamp forces browsers to re-fetch the favicon even if cached
-const v = Date.now();
+// Embed SVG as base64 data URI so the favicon travels with the HTML —
+// no separate file to cache, bypasses Chrome/Edge per-domain favicon cache.
+const svgContent = fs.readFileSync(path.join(assetsDir, "favicon.svg"), "utf8");
+const svgDataUri = `data:image/svg+xml;base64,${Buffer.from(svgContent).toString("base64")}`;
 
 html = html.replace(/<title>.*?<\/title>/, "<title>Rrëy: JÏT</title>");
 
 // Remove any existing favicon links (handles both first-run and re-patch)
 html = html.replace(/\s*<link rel="(icon|alternate icon)"[^>]*\/>/g, "");
 
-// Inject fresh favicon links with cache-buster, right before </head>
+// Inject inline data-URI favicon — immune to browser favicon caching
 html = html.replace(
   "</head>",
-  `  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=${v}" />\n  <link rel="alternate icon" href="/favicon.ico?v=${v}" />\n</head>`
+  `  <link rel="icon" type="image/svg+xml" href="${svgDataUri}" />\n</head>`
 );
 
 fs.writeFileSync(indexPath, html, "utf8");
