@@ -141,12 +141,16 @@ export async function recalculateInventoryAlertStatus(inventoryId: string): Prom
   const requirements = await prisma.productionRequirement.findMany({
     where: {
       inventoryId,
-      missingQuantity: { gt: 0 },
       productionPlan: {
         orderedAt: { not: null },
         approvalStatus: "APPROVED",
         productionStatus: { notIn: ["COMPLETED", "CANCELLED"] },
       },
+      // Track: gap exists (no order yet) OR an order was linked (track its timing)
+      OR: [
+        { missingQuantity: { gt: 0 } },
+        { linkedOrderId: { not: null } },
+      ],
     },
     include: {
       productionPlan: { select: { productionDate: true } },
