@@ -2,9 +2,15 @@ import { Router, Request, Response, NextFunction } from "express";
 import prisma from "../lib/prisma";
 import { z } from "zod";
 import { requireAuth, AuthRequest } from "../middleware/requireAuth";
-import { requireRole, RoleRequest } from "../middleware/requireRole";
+import { requireRole } from "../middleware/requireRole";
 import { canApproveProduction } from "../lib/permissions";
 import type { Role } from "../lib/permissions";
+import {
+  calculateProductionRequirements,
+  reserveStockForPlan,
+  releaseReservedStock,
+  analyzeProductionRequirements,
+} from "../lib/jit";
 
 const router = Router();
 
@@ -38,22 +44,30 @@ async function computePlanCost(style: string, batches: number) {
 // GET /api/production
 router.get("/", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { from, to, style } = req.query;
+    const { from, to, style, productionStatus } = req.query;
     const plans = await prisma.productionPlan.findMany({
       where: {
         ...(style ? { style: String(style) } : {}),
+        ...(productionStatus ? { productionStatus: productionStatus as any } : {}),
         productionDate: {
           ...(from ? { gte: new Date(String(from)) } : {}),
           ...(to ? { lte: new Date(String(to)) } : {}),
         },
       },
+      include: {
+        requirements: {
+          include: { material: true },
+        },
+      },
       orderBy: { productionDate: "asc" },
     });
     res.json(plans);
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
-// GET /api/production/pending — plans awaiting approval (SUPERVISOR/DEVELOPER only)
+// GET /api/production/pending — plans awaiting approval
 router.get(
   "/pending",
   requireAuth,
@@ -65,7 +79,9 @@ router.get(
         orderBy: { createdAt: "asc" },
       });
       res.json(plans);
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
   }
 );
 
@@ -76,20 +92,39 @@ router.get("/upcoming", requireAuth, async (_req: Request, res: Response, next: 
     const in7 = new Date(now);
     in7.setDate(in7.getDate() + 7);
     const plans = await prisma.productionPlan.findMany({
-      where: { productionDate: { gte: now, lte: in7 } },
+      where: {
+        productionDate: { gte: now, lte: in7 },
+        productionStatus: { notIn: ["COMPLETED", "CANCELLED"] },
+      },
+      include: {
+        requirements: {
+          include: { material: true },
+        },
+      },
       orderBy: { productionDate: "asc" },
     });
     res.json(plans);
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 // GET /api/production/:id
 router.get("/:id", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const plan = await prisma.productionPlan.findUnique({ where: { id: req.params.id } });
+    const plan = await prisma.productionPlan.findUnique({
+      where: { id: req.params.id },
+      include: {
+        requirements: {
+          include: { material: true, linkedOrder: true },
+        },
+      },
+    });
     if (!plan) return res.status(404).json({ error: "Plan not found" });
     res.json(plan);
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 // POST /api/production
@@ -122,8 +157,17 @@ router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunc
           : {}),
       },
     });
+
+    // If auto-approved, compute JIT requirements and reserve stock immediately
+    if (approvalStatus === "APPROVED") {
+      await calculateProductionRequirements(plan.id);
+      await reserveStockForPlan(plan.id);
+    }
+
     res.status(201).json(plan);
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 // POST /api/production/:id/approve
@@ -152,8 +196,15 @@ router.post(
           hasMissingPrices,
         },
       });
+
+      // Compute JIT requirements and reserve stock
+      await calculateProductionRequirements(plan.id);
+      await reserveStockForPlan(plan.id);
+
       res.json(updated);
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
   }
 );
 
@@ -182,7 +233,40 @@ router.post(
         },
       });
       res.json(updated);
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+// PATCH /api/production/:id/status — update execution status (COMPLETED / CANCELLED)
+router.patch(
+  "/:id/status",
+  requireAuth,
+  requireRole("DEVELOPER", "SUPERVISOR"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { productionStatus } = z
+        .object({ productionStatus: z.enum(["IN_PROGRESS", "COMPLETED", "CANCELLED"]) })
+        .parse(req.body);
+
+      const plan = await prisma.productionPlan.findUnique({ where: { id: req.params.id } });
+      if (!plan) return res.status(404).json({ error: "Plan not found" });
+
+      const updated = await prisma.productionPlan.update({
+        where: { id: req.params.id },
+        data: { productionStatus: productionStatus as any },
+      });
+
+      // Release stock reservations when execution is finished
+      if (productionStatus === "COMPLETED" || productionStatus === "CANCELLED") {
+        await releaseReservedStock(plan.id);
+      }
+
+      res.json(updated);
+    } catch (e) {
+      next(e);
+    }
   }
 );
 
@@ -211,88 +295,190 @@ router.put("/:id", requireAuth, async (req: Request, res: Response, next: NextFu
         hasMissingPrices,
       },
     });
+
+    // Recalculate JIT requirements if the plan is approved
+    if (existing.approvalStatus === "APPROVED") {
+      await calculateProductionRequirements(plan.id);
+      await reserveStockForPlan(plan.id);
+    }
+
     res.json(plan);
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 // DELETE /api/production/:id
 router.delete("/:id", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await prisma.productionPlan.delete({ where: { id: req.params.id } });
-    res.status(204).send();
-  } catch (e) { next(e); }
-});
-
-// POST /api/production/:id/generate-orders
-router.post("/:id/generate-orders", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const confirm = req.query.confirm === "true";
     const plan = await prisma.productionPlan.findUnique({ where: { id: req.params.id } });
     if (!plan) return res.status(404).json({ error: "Plan not found" });
 
-    if (plan.approvalStatus !== "APPROVED") {
-      return res.status(422).json({ error: "Solo se pueden generar pedidos para planes aprobados" });
+    // Release reservations before deleting (cascade deletes requirements)
+    await releaseReservedStock(req.params.id);
+    await prisma.productionPlan.delete({ where: { id: req.params.id } });
+    res.status(204).send();
+  } catch (e) {
+    next(e);
+  }
+});
+
+// GET /api/production/:id/jit-analysis — read-only JIT analysis (no DB writes)
+router.get(
+  "/:id/jit-analysis",
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const plan = await prisma.productionPlan.findUnique({ where: { id: req.params.id } });
+      if (!plan) return res.status(404).json({ error: "Plan not found" });
+
+      const analysis = await analyzeProductionRequirements(req.params.id);
+      res.json({ plan, analysis });
+    } catch (e) {
+      next(e);
     }
+  }
+);
 
-    const recipeLines = await prisma.recipeLine.findMany({
-      where: { beerStyle: plan.style },
-      include: { material: { include: { supplier: true, inventory: true } } },
-    });
+// POST /api/production/:id/recalculate-jit — refresh requirements + reservations
+router.post(
+  "/:id/recalculate-jit",
+  requireAuth,
+  requireRole("DEVELOPER", "SUPERVISOR"),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const plan = await prisma.productionPlan.findUnique({ where: { id: req.params.id } });
+      if (!plan) return res.status(404).json({ error: "Plan not found" });
+      if (plan.approvalStatus !== "APPROVED") {
+        return res.status(422).json({ error: "Solo se puede recalcular planes aprobados" });
+      }
 
-    if (recipeLines.length === 0) {
-      return res.status(422).json({ error: `No hay receta definida para "${plan.style}". Agrégala en Recetas.` });
+      await calculateProductionRequirements(plan.id);
+      await reserveStockForPlan(plan.id);
+
+      const updated = await prisma.productionPlan.findUnique({
+        where: { id: plan.id },
+        include: { requirements: { include: { material: true } } },
+      });
+      res.json(updated);
+    } catch (e) {
+      next(e);
     }
+  }
+);
 
-    const now = new Date();
-    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+// POST /api/production/:id/generate-orders
+router.post(
+  "/:id/generate-orders",
+  requireAuth,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const confirm = req.query.confirm === "true";
+      const plan = await prisma.productionPlan.findUnique({ where: { id: req.params.id } });
+      if (!plan) return res.status(404).json({ error: "Plan not found" });
 
-    const preview = recipeLines.map((line) => {
-      const needed = line.qtyPerBatch * plan.plannedBatches;
-      const currentStock = line.material.inventory?.currentStock ?? 0;
-      const shortfall = Math.max(0, needed - currentStock);
-      return {
-        materialId: line.materialId,
-        materialName: line.material.name,
-        unit: line.material.unit,
-        needed,
-        currentStock,
-        shortfall,
-        supplierId: line.material.supplierId,
-        supplierName: line.material.supplier?.name ?? null,
-        estimatedCost: shortfall * (line.material.unitPrice ?? 0),
-        willOrder: shortfall > 0,
-      };
-    });
+      if (plan.approvalStatus !== "APPROVED") {
+        return res
+          .status(422)
+          .json({ error: "Solo se pueden generar pedidos para planes aprobados" });
+      }
 
-    if (!confirm) {
-      return res.json({ plan, preview, totalEstimatedCost: preview.reduce((a, p) => a + p.estimatedCost, 0) });
-    }
+      const recipeLines = await prisma.recipeLine.findMany({
+        where: { beerStyle: plan.style },
+        include: { material: { include: { supplier: true, inventory: true } } },
+      });
 
-    await prisma.productionPlan.update({ where: { id: plan.id }, data: { orderedAt: now } });
+      if (recipeLines.length === 0) {
+        return res.status(422).json({
+          error: `No hay receta definida para "${plan.style}". Agrégala en Recetas.`,
+        });
+      }
 
-    const created = [];
-    for (const p of preview.filter((p) => p.willOrder)) {
-      const daysToOrder = (await prisma.supplier.findUnique({ where: { id: p.supplierId ?? "" } }))?.daysToOrder ?? 7;
-      const arrival = new Date(now);
-      arrival.setDate(arrival.getDate() + daysToOrder);
-      const order = await prisma.order.create({
-        data: {
-          folio: `PED-${Date.now()}-${p.materialId}`,
-          orderDate: now,
-          materialId: p.materialId,
-          supplierId: p.supplierId,
-          orderedQuantity: p.shortfall,
-          estimatedArrivalDate: arrival,
-          status: "PENDING",
-          month,
-          notes: `Auto-generado para ${plan.style} · ${plan.plannedBatches} lote(s) · ${now.toLocaleDateString("es-MX")}`,
+      // Refresh JIT requirements so preview uses up-to-date numbers
+      await calculateProductionRequirements(plan.id);
+
+      const requirements = await prisma.productionRequirement.findMany({
+        where: { productionPlanId: plan.id },
+        include: {
+          material: { include: { supplier: true } },
+          inventory: true,
         },
       });
-      created.push(order);
-    }
 
-    res.status(201).json({ created, skipped: preview.filter((p) => !p.willOrder).length });
-  } catch (e) { next(e); }
-});
+      const now = new Date();
+      const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+      const preview = requirements.map((req) => ({
+        materialId: req.materialId,
+        materialName: req.material.name,
+        unit: req.material.unit,
+        requiredQuantity: req.requiredQuantity,
+        currentStock: req.inventory.currentStock,
+        reservedByOthers:
+          (req.inventory.reservedStock ?? 0) - req.reservedQuantity,
+        incomingQuantity: 0, // populated client-side from analysis if needed
+        missingQuantity: req.missingQuantity,
+        isCritical: req.isCritical,
+        actionStatus: req.actionStatus,
+        supplierId: req.material.supplierId,
+        supplierName: req.material.supplier?.name ?? null,
+        estimatedCost: req.missingQuantity * (req.material.unitPrice ?? 0),
+        willOrder: req.missingQuantity > 0,
+      }));
+
+      const totalEstimatedCost = preview.reduce((a, p) => a + p.estimatedCost, 0);
+
+      if (!confirm) {
+        return res.json({ plan, preview, totalEstimatedCost });
+      }
+
+      // Create orders for materials with missing quantity
+      await prisma.productionPlan.update({
+        where: { id: plan.id },
+        data: { orderedAt: now },
+      });
+
+      const created = [];
+      for (const p of preview.filter((p) => p.willOrder)) {
+        const supplier = p.supplierId
+          ? await prisma.supplier.findUnique({ where: { id: p.supplierId } })
+          : null;
+        const daysToOrder = supplier?.daysToOrder ?? 7;
+        const arrival = new Date(now);
+        arrival.setDate(arrival.getDate() + daysToOrder);
+
+        const order = await prisma.order.create({
+          data: {
+            folio: `PED-${Date.now()}-${p.materialId.slice(-4).toUpperCase()}`,
+            orderDate: now,
+            materialId: p.materialId,
+            supplierId: p.supplierId,
+            productionPlanId: plan.id,
+            orderedQuantity: p.missingQuantity,
+            estimatedArrivalDate: arrival,
+            status: "PENDING",
+            month,
+            notes: `Auto-generado para ${plan.style} · ${plan.plannedBatches} lote(s) · ${now.toLocaleDateString("es-MX")}`,
+          },
+        });
+
+        // Link order to the requirement
+        await prisma.productionRequirement.updateMany({
+          where: { productionPlanId: plan.id, materialId: p.materialId },
+          data: { linkedOrderId: order.id },
+        });
+
+        created.push(order);
+      }
+
+      // Refresh requirements after orders are created
+      await calculateProductionRequirements(plan.id);
+
+      res.status(201).json({ created, skipped: preview.filter((p) => !p.willOrder).length });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
 
 export default router;

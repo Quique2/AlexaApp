@@ -6,11 +6,14 @@ import {
   GenerateOrdersPreview,
   ImportResult,
   InventoryRow,
+  JITSummary,
   Material,
   Order,
   ProductionPlan,
+  ProductionStatus,
   Reception,
   RecipeLine,
+  RequirementAnalysis,
   Role,
   Supplier,
 } from "../types";
@@ -83,6 +86,7 @@ export const authApi = {
 export const dashboardApi = {
   summary: () => request<DashboardSummary>("/dashboard/summary"),
   spend: () => request<{ month: string; total: number; orders: number }[]>("/dashboard/spend"),
+  jitSummary: () => request<JITSummary>("/dashboard/jit-summary"),
 };
 
 // ─── Inventory ───────────────────────────────────────────────────────────────
@@ -94,6 +98,7 @@ export const inventoryApi = {
     return request<InventoryRow[]>(`/inventory${qs ? `?${qs}` : ""}`);
   },
   alerts: () => request<InventoryRow[]>("/inventory/alerts"),
+  critical: () => request<InventoryRow[]>("/inventory/critical"),
   get: (materialId: string) => request<InventoryRow>(`/inventory/${materialId}`),
   update: (
     materialId: string,
@@ -139,7 +144,7 @@ export const materialsApi = {
 
 // ─── Production ──────────────────────────────────────────────────────────────
 export const productionApi = {
-  list: (params?: { from?: string; to?: string; style?: string }) => {
+  list: (params?: { from?: string; to?: string; style?: string; productionStatus?: string }) => {
     const qs = new URLSearchParams(
       Object.entries(params ?? {}).filter(([, v]) => v !== undefined) as [string, string][]
     ).toString();
@@ -148,7 +153,16 @@ export const productionApi = {
   pending: () => request<ProductionPlan[]>("/production/pending"),
   upcoming: () => request<ProductionPlan[]>("/production/upcoming"),
   get: (id: string) => request<ProductionPlan>(`/production/${id}`),
-  create: (data: Omit<ProductionPlan, "id" | "totalMaltKg" | "totalHopKg" | "totalYeastG" | "approvalStatus" | "approvedById" | "approvedAt" | "rejectedById" | "rejectedAt" | "rejectionReason" | "hasMissingPrices" | "estimatedCost" | "createdById" | "createdAt" | "updatedAt">) =>
+  create: (data: {
+    productionDate: string;
+    style: string;
+    plannedBatches: number;
+    maltKgPerBatch: number;
+    hopKgPerBatch: number;
+    yeastGPerBatch: number;
+    notes?: string | null;
+    orderedAt?: string | null;
+  }) =>
     request<ProductionPlan>("/production", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<ProductionPlan>) =>
     request<ProductionPlan>(`/production/${id}`, { method: "PUT", body: JSON.stringify(data) }),
@@ -160,11 +174,22 @@ export const productionApi = {
       method: "POST",
       body: JSON.stringify({ reason }),
     }),
+  updateStatus: (id: string, productionStatus: Exclude<ProductionStatus, "PENDING">) =>
+    request<ProductionPlan>(`/production/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ productionStatus }),
+    }),
+  jitAnalysis: (id: string) =>
+    request<{ plan: ProductionPlan; analysis: RequirementAnalysis[] }>(
+      `/production/${id}/jit-analysis`
+    ),
+  recalculateJIT: (id: string) =>
+    request<ProductionPlan>(`/production/${id}/recalculate-jit`, { method: "POST" }),
 };
 
 // ─── Orders ──────────────────────────────────────────────────────────────────
 export const ordersApi = {
-  list: (params?: { status?: string; materialId?: string }) => {
+  list: (params?: { status?: string; materialId?: string; productionPlanId?: string }) => {
     const qs = new URLSearchParams(
       Object.entries(params ?? {}).filter(([, v]) => v !== undefined) as [string, string][]
     ).toString();
@@ -175,10 +200,27 @@ export const ordersApi = {
       "/orders/summary/monthly"
     ),
   get: (id: string) => request<Order>(`/orders/${id}`),
-  create: (data: Omit<Order, "id" | "folio" | "month" | "material" | "supplier" | "receptions" | "createdAt" | "updatedAt">) =>
+  create: (
+    data: Omit<Order, "id" | "folio" | "month" | "material" | "supplier" | "productionPlan" | "receptions" | "createdAt" | "updatedAt">
+  ) =>
     request<Order>("/orders", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Order>) =>
     request<Order>(`/orders/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  confirmReceived: (
+    id: string,
+    data: {
+      receivedQuantity: number;
+      condition?: string;
+      batchLot?: string | null;
+      receivedBy?: string | null;
+      notes?: string | null;
+      isConforming?: boolean;
+    }
+  ) =>
+    request<{ reception: Reception; orderStatus: string; totalReceived: number }>(
+      `/orders/${id}/confirm-received`,
+      { method: "PATCH", body: JSON.stringify(data) }
+    ),
   delete: (id: string) => request<void>(`/orders/${id}`, { method: "DELETE" }),
 };
 

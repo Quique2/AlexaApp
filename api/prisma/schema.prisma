@@ -22,6 +22,13 @@ enum AlertStatus {
   NONE
 }
 
+enum ActionStatus {
+  ORDER_NOW
+  ORDER_SOON
+  COVERED
+  OK
+}
+
 enum OrderStatus {
   PENDING
   IN_TRANSIT
@@ -59,6 +66,13 @@ enum ApprovalStatus {
   REJECTED
 }
 
+enum ProductionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
 enum BlockType {
   EMAIL
   IP
@@ -84,20 +98,22 @@ model Supplier {
 }
 
 model Material {
-  id          String        @id
-  name        String
-  type        MaterialType
-  brand       String?
-  unit        String
-  unitPrice   Float         @default(0)
-  priceUnit   String?
-  supplierId  String?
-  supplier    Supplier?     @relation(fields: [supplierId], references: [id])
-  inventory   Inventory?
-  orders      Order[]
-  recipeLines RecipeLine[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id           String                 @id
+  name         String
+  type         MaterialType
+  brand        String?
+  unit         String
+  unitPrice    Float                  @default(0)
+  priceUnit    String?
+  supplierId   String?
+  supplier     Supplier?              @relation(fields: [supplierId], references: [id])
+  inventory    Inventory?
+  orders       Order[]
+  recipeLines  RecipeLine[]
+  requirements ProductionRequirement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("materials")
 }
@@ -116,70 +132,101 @@ model RecipeLine {
 }
 
 model Inventory {
-  id                 String      @id @default(uuid())
-  materialId         String      @unique
-  material           Material    @relation(fields: [materialId], references: [id])
-  currentStock       Float       @default(0)
-  dailyConsumption   Float       @default(0)
-  reorderPointDays   Int         @default(7)
-  alertStatus        AlertStatus @default(NONE)
-  quantityToOrder    Float       @default(0)
-  estimatedOrderCost Float       @default(0)
+  id                 String                 @id @default(uuid())
+  materialId         String                 @unique
+  material           Material               @relation(fields: [materialId], references: [id])
+  currentStock       Float                  @default(0)
+  reservedStock      Float                  @default(0)
+  dailyConsumption   Float                  @default(0)
+  reorderPointDays   Int                    @default(7)
+  alertStatus        AlertStatus            @default(NONE)
+  isCritical         Boolean                @default(false)
+  quantityToOrder    Float                  @default(0)
+  estimatedOrderCost Float                  @default(0)
   notes              String?
-  updatedAt          DateTime    @updatedAt
+  requirements       ProductionRequirement[]
+  updatedAt          DateTime               @updatedAt
 
   @@map("inventory")
 }
 
 model ProductionPlan {
-  id               String         @id @default(uuid())
+  id               String                 @id @default(uuid())
   productionDate   DateTime
   style            String
-  plannedBatches   Int            @default(1)
-  maltKgPerBatch   Float          @default(0)
-  hopKgPerBatch    Float          @default(0)
-  yeastGPerBatch   Float          @default(0)
-  totalMaltKg      Float          @default(0)
-  totalHopKg       Float          @default(0)
-  totalYeastG      Float          @default(0)
+  plannedBatches   Int                    @default(1)
+  maltKgPerBatch   Float                  @default(0)
+  hopKgPerBatch    Float                  @default(0)
+  yeastGPerBatch   Float                  @default(0)
+  totalMaltKg      Float                  @default(0)
+  totalHopKg       Float                  @default(0)
+  totalYeastG      Float                  @default(0)
   notes            String?
   orderedAt        DateTime?
-  approvalStatus   ApprovalStatus @default(PENDING)
+  approvalStatus   ApprovalStatus         @default(PENDING)
+  productionStatus ProductionStatus       @default(PENDING)
   approvedById     String?
-  approvedBy       User?          @relation("PlanApprovedBy", fields: [approvedById], references: [id])
+  approvedBy       User?                  @relation("PlanApprovedBy", fields: [approvedById], references: [id])
   approvedAt       DateTime?
   rejectedById     String?
-  rejectedBy       User?          @relation("PlanRejectedBy", fields: [rejectedById], references: [id])
+  rejectedBy       User?                  @relation("PlanRejectedBy", fields: [rejectedById], references: [id])
   rejectedAt       DateTime?
   rejectionReason  String?
-  hasMissingPrices Boolean        @default(false)
-  estimatedCost    Float          @default(0)
+  hasMissingPrices Boolean                @default(false)
+  estimatedCost    Float                  @default(0)
   createdById      String?
-  createdBy        User?          @relation("PlanCreatedBy", fields: [createdById], references: [id])
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  createdBy        User?                  @relation("PlanCreatedBy", fields: [createdById], references: [id])
+  requirements     ProductionRequirement[]
+  orders           Order[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
 
   @@map("production_plans")
 }
 
+model ProductionRequirement {
+  id               String          @id @default(uuid())
+  productionPlanId String
+  productionPlan   ProductionPlan  @relation(fields: [productionPlanId], references: [id], onDelete: Cascade)
+  inventoryId      String
+  inventory        Inventory       @relation(fields: [inventoryId], references: [id])
+  materialId       String
+  material         Material        @relation(fields: [materialId], references: [id])
+  requiredQuantity Float
+  reservedQuantity Float           @default(0)
+  missingQuantity  Float           @default(0)
+  isCritical       Boolean         @default(false)
+  actionStatus     ActionStatus    @default(OK)
+  linkedOrderId    String?
+  linkedOrder      Order?          @relation("RequirementOrder", fields: [linkedOrderId], references: [id])
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@unique([productionPlanId, materialId])
+  @@map("production_requirements")
+}
+
 model Order {
-  id                   String         @id @default(uuid())
-  folio                String         @unique
+  id                   String                 @id @default(uuid())
+  folio                String                 @unique
   orderDate            DateTime
   materialId           String
-  material             Material       @relation(fields: [materialId], references: [id])
+  material             Material               @relation(fields: [materialId], references: [id])
   supplierId           String?
-  supplier             Supplier?      @relation(fields: [supplierId], references: [id])
+  supplier             Supplier?              @relation(fields: [supplierId], references: [id])
+  productionPlanId     String?
+  productionPlan       ProductionPlan?        @relation(fields: [productionPlanId], references: [id])
   orderedQuantity      Float
   totalPaid            Float?
   paymentMethod        PaymentMethod?
   estimatedArrivalDate DateTime?
-  status               OrderStatus    @default(PENDING)
+  status               OrderStatus            @default(PENDING)
   month                String
   notes                String?
   receptions           Reception[]
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
+  linkedRequirements   ProductionRequirement[] @relation("RequirementOrder")
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
   @@map("orders")
 }
@@ -201,14 +248,14 @@ model Reception {
 }
 
 model JITConfig {
-  id                  Int      @id @default(1)
-  workingDaysPerWeek  Int      @default(5)
-  maxDaysRawMaterial  Int      @default(7)
-  hopCoverageDays     Int      @default(90)
-  yeastCoverageDays   Int      @default(15)
-  safetyBufferDays    Int      @default(1)
-  avgDailyProduction  Float    @default(1)
-  updatedAt           DateTime @updatedAt
+  id                 Int      @id @default(1)
+  workingDaysPerWeek Int      @default(5)
+  maxDaysRawMaterial Int      @default(7)
+  hopCoverageDays    Int      @default(90)
+  yeastCoverageDays  Int      @default(15)
+  safetyBufferDays   Int      @default(1)
+  avgDailyProduction Float    @default(1)
+  updatedAt          DateTime @updatedAt
 
   @@map("jit_config")
 }

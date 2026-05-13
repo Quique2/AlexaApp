@@ -38,9 +38,16 @@ export function InventoryRow({ item, onPress }: InventoryRowProps) {
       </View>
 
       <View style={styles.center}>
-        <Text style={[typography.h4, { fontSize: 14 }]} numberOfLines={1}>
-          {mat.name}
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Text style={[typography.h4, { fontSize: 14 }]} numberOfLines={1}>
+            {mat.name}
+          </Text>
+          {item.isCritical && (
+            <View style={[styles.criticalBadge, { backgroundColor: colors.red + "22", borderColor: colors.red + "66" }]}>
+              <Text style={{ fontSize: 8, fontWeight: "700", color: colors.red }}>CRÍTICO</Text>
+            </View>
+          )}
+        </View>
         <Text style={typography.caption}>
           {TYPE_LABELS[mat.type] ?? mat.type}
           {mat.brand ? ` · ${mat.brand}` : ""}
@@ -53,6 +60,11 @@ export function InventoryRow({ item, onPress }: InventoryRowProps) {
         </Text>
         {coverage !== null && (
           <Text style={typography.caption}>{coverage}d cobertura</Text>
+        )}
+        {(item.reservedStock ?? 0) > 0 && (
+          <Text style={[typography.caption, { color: colors.gold }]}>
+            {item.reservedStock} reservado
+          </Text>
         )}
       </View>
     </Pressable>
@@ -74,5 +86,11 @@ function makeStyles(colors: Colors) {
     left: { width: 32, alignItems: "center" },
     center: { flex: 1, gap: 2 },
     right: { alignItems: "flex-end", gap: 2 },
+    criticalBadge: {
+      paddingHorizontal: 4,
+      paddingVertical: 1,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+    },
   });
 }

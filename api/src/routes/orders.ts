@@ -1,7 +1,8 @@
-﻿import { Router, Request, Response, NextFunction } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { OrderStatus, PaymentMethod } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { z } from "zod";
+import { syncInventoryState } from "../lib/jit";
 
 const router = Router();
 
@@ -9,6 +10,7 @@ const OrderSchema = z.object({
   orderDate: z.string().transform((s) => new Date(s)),
   materialId: z.string(),
   supplierId: z.string().optional().nullable(),
+  productionPlanId: z.string().optional().nullable(),
   orderedQuantity: z.number().positive(),
   totalPaid: z.number().optional().nullable(),
   paymentMethod: z.nativeEnum(PaymentMethod).optional().nullable(),
@@ -35,17 +37,19 @@ function monthLabel(date: Date): string {
 // GET /api/orders
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { status, materialId, month } = req.query;
+    const { status, materialId, month, productionPlanId } = req.query;
     const orders = await prisma.order.findMany({
       where: {
         ...(status ? { status: status as OrderStatus } : {}),
         ...(materialId ? { materialId: String(materialId) } : {}),
         ...(month ? { month: String(month) } : {}),
+        ...(productionPlanId ? { productionPlanId: String(productionPlanId) } : {}),
       },
       include: {
         material: true,
         supplier: true,
         receptions: true,
+        productionPlan: { select: { id: true, style: true, productionDate: true } },
       },
       orderBy: { orderDate: "desc" },
     });
@@ -69,8 +73,7 @@ router.get("/summary/monthly", async (_req: Request, res: Response, next: NextFu
         month: s.month,
         totalPaid: s._sum.totalPaid ?? 0,
         orderCount: s._count.id,
-        avgPerOrder:
-          s._count.id > 0 ? (s._sum.totalPaid ?? 0) / s._count.id : 0,
+        avgPerOrder: s._count.id > 0 ? (s._sum.totalPaid ?? 0) / s._count.id : 0,
       }))
     );
   } catch (e) {
@@ -83,7 +86,17 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const order = await prisma.order.findUnique({
       where: { id: req.params.id },
-      include: { material: true, supplier: true, receptions: true },
+      include: {
+        material: true,
+        supplier: true,
+        receptions: true,
+        productionPlan: { select: { id: true, style: true, productionDate: true } },
+        linkedRequirements: {
+          include: {
+            productionPlan: { select: { id: true, style: true, productionDate: true } },
+          },
+        },
+      },
     });
     if (!order) return res.status(404).json({ error: "Order not found" });
     res.json(order);
@@ -96,9 +109,7 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
 router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = OrderSchema.parse(req.body);
-    const material = await prisma.material.findUnique({
-      where: { id: data.materialId },
-    });
+    const material = await prisma.material.findUnique({ where: { id: data.materialId } });
     if (!material) return res.status(400).json({ error: "Material not found" });
 
     const id = crypto.randomUUID();
@@ -113,6 +124,7 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
         month,
         materialId: data.materialId,
         supplierId,
+        productionPlanId: data.productionPlanId,
         orderDate: data.orderDate,
         orderedQuantity: data.orderedQuantity,
         totalPaid: data.totalPaid,
@@ -144,6 +156,78 @@ router.put("/:id", async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+// PATCH /api/orders/:id/confirm-received — register a receipt and sync inventory
+router.patch("/:id/confirm-received", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { receivedQuantity, condition, batchLot, receivedBy, notes, isConforming } = z
+      .object({
+        receivedQuantity: z.number().positive(),
+        condition: z
+          .enum(["GOOD", "REGULAR", "DAMAGED", "INCOMPLETE", "EXPIRED"])
+          .default("GOOD"),
+        batchLot: z.string().optional().nullable(),
+        receivedBy: z.string().optional().nullable(),
+        notes: z.string().optional().nullable(),
+        isConforming: z.boolean().default(true),
+      })
+      .parse(req.body);
+
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: {
+        receptions: { select: { receivedQuantity: true, isConforming: true } },
+        material: { include: { inventory: true } },
+      },
+    });
+    if (!order) return res.status(404).json({ error: "Order not found" });
+    if (["RECEIVED_COMPLETE", "CANCELLED"].includes(order.status)) {
+      return res.status(409).json({ error: "La orden ya está cerrada o cancelada" });
+    }
+
+    // Create reception record
+    const reception = await prisma.reception.create({
+      data: {
+        receptionDate: new Date(),
+        orderId: order.id,
+        receivedQuantity,
+        condition: condition as any,
+        isConforming,
+        batchLot,
+        receivedBy,
+        notes,
+      },
+    });
+
+    // Compute total received across all conforming receptions
+    const previousConformingTotal = order.receptions
+      .filter((r) => r.isConforming)
+      .reduce((s, r) => s + r.receivedQuantity, 0);
+    const totalReceived = previousConformingTotal + (isConforming ? receivedQuantity : 0);
+
+    const newStatus: OrderStatus =
+      totalReceived >= order.orderedQuantity ? "RECEIVED_COMPLETE" : "RECEIVED_PARTIAL";
+
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { status: newStatus },
+    });
+
+    // Update inventory stock for conforming receptions
+    const inventory = order.material.inventory;
+    if (isConforming && inventory) {
+      await prisma.inventory.update({
+        where: { id: inventory.id },
+        data: { currentStock: { increment: receivedQuantity } },
+      });
+      await syncInventoryState(inventory.id);
+    }
+
+    res.json({ reception, orderStatus: newStatus, totalReceived });
+  } catch (e) {
+    next(e);
+  }
+});
+
 // DELETE /api/orders/:id
 router.delete("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -156,4 +240,3 @@ router.delete("/:id", async (req: Request, res: Response, next: NextFunction) =>
 });
 
 export default router;
-

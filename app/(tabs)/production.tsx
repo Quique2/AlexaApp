@@ -236,6 +236,9 @@ function PlanCard({
   const isOrdered = !!plan.orderedAt;
   const isPending = plan.approvalStatus === "PENDING";
   const isRejected = plan.approvalStatus === "REJECTED";
+  const isCompleted = plan.productionStatus === "COMPLETED";
+  const isCancelledProd = plan.productionStatus === "CANCELLED";
+  const isInProgress = plan.productionStatus === "IN_PROGRESS";
 
   return (
     <View style={[planCardStyles.card, { borderBottomColor: colors.border }, isToday && !isPending && { backgroundColor: colors.surface }]}>
@@ -252,6 +255,21 @@ function PlanCard({
           {isRejected && (
             <View style={[planCardStyles.statusBadge, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Text style={[typography.label, { fontSize: 8, color: colors.textMuted }]}>RECHAZADO</Text>
+            </View>
+          )}
+          {isInProgress && (
+            <View style={[planCardStyles.statusBadge, { backgroundColor: colors.goldDim + "22", borderColor: colors.goldDim + "66" }]}>
+              <Text style={[typography.label, { fontSize: 8, color: colors.gold }]}>EN PROCESO</Text>
+            </View>
+          )}
+          {isCompleted && (
+            <View style={[planCardStyles.statusBadge, { backgroundColor: colors.greenBg, borderColor: colors.green + "66" }]}>
+              <Text style={[typography.label, { fontSize: 8, color: colors.green }]}>COMPLETADO</Text>
+            </View>
+          )}
+          {isCancelledProd && (
+            <View style={[planCardStyles.statusBadge, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[typography.label, { fontSize: 8, color: colors.textMuted }]}>CANCELADO</Text>
             </View>
           )}
         </View>
@@ -472,8 +490,13 @@ function GenerateOrdersModal({ plan, onClose }: { plan: ProductionPlan; onClose:
                           <Text style={typography.caption}>{item.supplierName ?? "Sin proveedor"} · Stock: {item.currentStock}{item.unit}</Text>
                         </View>
                         <View style={styles.previewRight}>
-                          <Text style={[typography.bodySmall, { fontWeight: "700", color: colors.gold }]}>{item.shortfall.toFixed(2)} {item.unit}</Text>
+                          <Text style={[typography.bodySmall, { fontWeight: "700", color: item.isCritical ? colors.red : colors.gold }]}>
+                            {item.missingQuantity.toFixed(2)} {item.unit}
+                          </Text>
                           <Text style={[typography.caption, { color: colors.textSecondary }]}>{MXN(item.estimatedCost)}</Text>
+                          {item.isCritical && (
+                            <Text style={[typography.label, { fontSize: 8, color: colors.red }]}>⚠ CRÍTICO</Text>
+                          )}
                         </View>
                       </View>
                     ))}

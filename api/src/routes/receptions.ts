@@ -1,18 +1,8 @@
-﻿import { Router, Request, Response, NextFunction } from "express";
-import { ReceptionCondition, AlertStatus } from "@prisma/client";
+import { Router, Request, Response, NextFunction } from "express";
+import { ReceptionCondition } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { z } from "zod";
-
-function computeAlertStatus(
-  currentStock: number, dailyConsumption: number,
-  reorderPointDays: number, daysToOrder: number
-): AlertStatus {
-  if (dailyConsumption === 0) return "NONE";
-  const coverage = currentStock / dailyConsumption;
-  if (currentStock === 0 || coverage <= daysToOrder) return "RED";
-  if (coverage <= reorderPointDays) return "YELLOW";
-  return "GREEN";
-}
+import { syncInventoryState } from "../lib/jit";
 
 const router = Router();
 
@@ -60,9 +50,14 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
 router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = ReceptionSchema.parse(req.body);
+
     const order = await prisma.order.findUnique({
       where: { id: data.orderId },
-      include: { material: true },
+      include: {
+        material: { include: { inventory: true } },
+        // Load existing receptions to correctly compute total received
+        receptions: { select: { receivedQuantity: true, isConforming: true } },
+      },
     });
     if (!order) return res.status(400).json({ error: "Order not found" });
 
@@ -71,43 +66,28 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       include: { order: { include: { material: true } } },
     });
 
-    // Auto-update order status and inventory stock
     if (data.isConforming) {
+      // Sum all conforming receptions (including this new one)
+      const previousTotal = order.receptions
+        .filter((r) => r.isConforming)
+        .reduce((s, r) => s + r.receivedQuantity, 0);
+      const totalReceived = previousTotal + data.receivedQuantity;
+
       await prisma.order.update({
         where: { id: data.orderId },
         data: {
           status:
-            data.receivedQuantity >= order.orderedQuantity
-              ? "RECEIVED_COMPLETE"
-              : "RECEIVED_PARTIAL",
+            totalReceived >= order.orderedQuantity ? "RECEIVED_COMPLETE" : "RECEIVED_PARTIAL",
         },
       });
 
-      const inv = await prisma.inventory.findUnique({
-        where: { materialId: order.materialId },
-        include: { material: { include: { supplier: true } } },
-      });
-
-      if (inv) {
-        const newStock = inv.currentStock + data.receivedQuantity;
-        const daysToOrder = inv.material.supplier?.daysToOrder ?? 7;
-        const newAlert = computeAlertStatus(
-          newStock, inv.dailyConsumption, inv.reorderPointDays, daysToOrder
-        );
-        const newQtyToOrder =
-          inv.dailyConsumption > 0
-            ? Math.max(0, inv.dailyConsumption * inv.reorderPointDays - newStock)
-            : 0;
-
+      const inventory = order.material.inventory;
+      if (inventory) {
         await prisma.inventory.update({
-          where: { materialId: order.materialId },
-          data: {
-            currentStock: newStock,
-            alertStatus: newAlert,
-            quantityToOrder: newQtyToOrder,
-            estimatedOrderCost: newQtyToOrder * (inv.material.unitPrice ?? 0),
-          },
+          where: { id: inventory.id },
+          data: { currentStock: { increment: data.receivedQuantity } },
         });
+        await syncInventoryState(inventory.id);
       }
     }
 
@@ -118,4 +98,3 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
 });
 
 export default router;
-

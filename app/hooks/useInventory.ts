@@ -17,6 +17,14 @@ export function useInventoryAlerts() {
   });
 }
 
+export function useCriticalInventory() {
+  return useQuery({
+    queryKey: ["inventory", "critical"],
+    queryFn: inventoryApi.critical,
+    refetchInterval: 30_000,
+  });
+}
+
 export function useUpdateInventory() {
   const qc = useQueryClient();
   return useMutation({

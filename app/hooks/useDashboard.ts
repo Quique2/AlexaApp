@@ -15,3 +15,11 @@ export function useSpendHistory() {
     queryFn: dashboardApi.spend,
   });
 }
+
+export function useJITSummary() {
+  return useQuery({
+    queryKey: ["dashboard", "jit-summary"],
+    queryFn: dashboardApi.jitSummary,
+    refetchInterval: 60_000,
+  });
+}

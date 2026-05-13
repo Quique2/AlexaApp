@@ -105,6 +105,7 @@ export default function DashboardScreen() {
             {s.alerts.red > 0
               ? `🔴 ${s.alerts.red} materiales PEDIR YA · ${s.alerts.yellow} pedir pronto`
               : `🟡 ${s.alerts.yellow} materiales pedir pronto`}
+            {s.alerts.critical > 0 ? ` · ⚠ ${s.alerts.critical} críticos JIT` : ""}
           </Text>
           <Text style={[typography.label, { color: s.alerts.red > 0 ? colors.red : colors.yellow }]}>
             Ver →
@@ -118,6 +119,17 @@ export default function DashboardScreen() {
         <KPICard label="🟡 PEDIR PRONTO" value={s.alerts.yellow} sub="materiales con alerta" accent="yellow" onPress={() => router.push("/inventory")} />
         <KPICard label="🟢 OK" value={s.alerts.green} sub="materiales en stock" accent="green" />
       </View>
+      {s.alerts.critical > 0 && (
+        <Pressable
+          style={[styles.criticalBar, { backgroundColor: colors.redBg, borderColor: colors.red }]}
+          onPress={() => router.push("/inventory")}
+        >
+          <Text style={[typography.bodySmall, { fontWeight: "700", color: colors.red, flex: 1 }]}>
+            ⚠ {s.alerts.critical} material{s.alerts.critical > 1 ? "es" : ""} crítico{s.alerts.critical > 1 ? "s" : ""} para producción pendiente
+          </Text>
+          <Text style={[typography.label, { color: colors.red }]}>Ver →</Text>
+        </Pressable>
+      )}
 
       <SectionHeader title="PRODUCCIÓN & GASTO" />
       <View style={styles.kpiRow}>
@@ -269,6 +281,17 @@ function makeStyles(colors: Colors) {
       alignItems: "center",
       justifyContent: "space-between",
       marginHorizontal: spacing.md,
+      marginBottom: spacing.xs,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: radius.md,
+      borderWidth: 1,
+    },
+    criticalBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginHorizontal: spacing.md,
+      marginTop: spacing.xs,
       marginBottom: spacing.xs,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,

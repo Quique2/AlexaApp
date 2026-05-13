@@ -1,5 +1,7 @@
 export type MaterialType = "LUPULO" | "MALTA" | "YEAST" | "ADJUNTO" | "OTRO";
 export type AlertStatus = "RED" | "YELLOW" | "GREEN" | "NONE";
+export type ActionStatus = "ORDER_NOW" | "ORDER_SOON" | "COVERED" | "OK";
+export type ProductionStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 export type OrderStatus =
   | "PENDING"
   | "IN_TRANSIT"
@@ -49,18 +51,41 @@ export interface Material {
   inventory?: InventoryRow | null;
 }
 
+export interface ProductionRequirement {
+  id: string;
+  productionPlanId: string;
+  inventoryId: string;
+  materialId: string;
+  material?: { name: string; unit: string };
+  requiredQuantity: number;
+  reservedQuantity: number;
+  missingQuantity: number;
+  isCritical: boolean;
+  actionStatus: ActionStatus;
+  linkedOrderId: string | null;
+  linkedOrder?: {
+    id: string;
+    folio: string;
+    estimatedArrivalDate: string | null;
+    status: OrderStatus;
+  } | null;
+}
+
 export interface InventoryRow {
   id: string;
   materialId: string;
   material?: Material;
   currentStock: number;
+  reservedStock: number;
   dailyConsumption: number;
   reorderPointDays: number;
   alertStatus: AlertStatus;
+  isCritical: boolean;
   quantityToOrder: number;
   estimatedOrderCost: number;
   notes: string | null;
   updatedAt: string;
+  requirements?: ProductionRequirement[];
 }
 
 export interface ProductionPlan {
@@ -77,6 +102,7 @@ export interface ProductionPlan {
   notes: string | null;
   orderedAt: string | null;
   approvalStatus: ApprovalStatus;
+  productionStatus: ProductionStatus;
   approvedById: string | null;
   approvedAt: string | null;
   rejectedById: string | null;
@@ -86,6 +112,8 @@ export interface ProductionPlan {
   estimatedCost: number;
   createdById: string | null;
   createdAt: string;
+  requirements?: ProductionRequirement[];
+  hasCriticalRequirements?: boolean;
 }
 
 export interface Order {
@@ -96,6 +124,8 @@ export interface Order {
   material?: Material;
   supplierId: string | null;
   supplier?: Supplier | null;
+  productionPlanId: string | null;
+  productionPlan?: { id: string; style: string; productionDate: string } | null;
   orderedQuantity: number;
   totalPaid: number | null;
   paymentMethod: PaymentMethod | null;
@@ -134,9 +164,13 @@ export interface OrderPreviewItem {
   materialId: string;
   materialName: string;
   unit: string;
-  needed: number;
+  requiredQuantity: number;
   currentStock: number;
-  shortfall: number;
+  reservedByOthers: number;
+  incomingQuantity: number;
+  missingQuantity: number;
+  isCritical: boolean;
+  actionStatus: ActionStatus;
   supplierId: string | null;
   supplierName: string | null;
   estimatedCost: number;
@@ -149,11 +183,39 @@ export interface GenerateOrdersPreview {
   totalEstimatedCost: number;
 }
 
+export interface RequirementAnalysis {
+  materialId: string;
+  materialName: string;
+  unit: string;
+  requiredQuantity: number;
+  currentStock: number;
+  reservedByOthers: number;
+  incomingQuantity: number;
+  effectiveAvailable: number;
+  missingQuantity: number;
+  isCritical: boolean;
+  actionStatus: ActionStatus;
+  bestExpectedDelivery: string | null;
+  supplierName: string | null;
+  daysToOrder: number;
+}
+
+export interface JITSummary {
+  requirements: {
+    orderNow: number;
+    orderSoon: number;
+    covered: number;
+    ok: number;
+  };
+  criticalItems: InventoryRow[];
+  urgentPlans: ProductionPlan[];
+}
+
 export interface DashboardSummary {
-  alerts: { red: number; yellow: number; green: number; none: number };
+  alerts: { red: number; yellow: number; green: number; none: number; critical: number };
   totalMaterials: number;
   upcoming: {
-    plans: ProductionPlan[];
+    plans: (ProductionPlan & { hasCriticalRequirements: boolean })[];
     batches: number;
     maltKg: number;
     hopKg: number;

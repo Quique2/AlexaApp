@@ -6,22 +6,10 @@ import * as XLSX from "xlsx";
 import multer from "multer";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
+import { computeAlertStatus, syncInventoryState } from "../lib/jit";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
-
-function computeAlertStatus(
-  currentStock: number,
-  dailyConsumption: number,
-  reorderPointDays: number,
-  daysToOrder: number
-): AlertStatus {
-  if (dailyConsumption === 0) return "NONE";
-  const coverageDays = currentStock / dailyConsumption;
-  if (currentStock === 0 || coverageDays <= daysToOrder) return "RED";
-  if (coverageDays <= reorderPointDays) return "YELLOW";
-  return "GREEN";
-}
 
 const UpdateSchema = z.object({
   currentStock: z.number().min(0).optional(),
@@ -46,7 +34,40 @@ router.get("/", requireAuth, async (req: Request, res: Response, next: NextFunct
       orderBy: [{ alertStatus: "asc" }, { material: { name: "asc" } }],
     });
     res.json(rows);
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
+});
+
+// GET /api/inventory/critical — items flagged as critical by JIT
+router.get("/critical", requireAuth, async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const rows = await prisma.inventory.findMany({
+      where: { isCritical: true },
+      include: {
+        material: { include: { supplier: true } },
+        requirements: {
+          where: {
+            isCritical: true,
+            productionPlan: {
+              approvalStatus: "APPROVED",
+              productionStatus: { notIn: ["COMPLETED", "CANCELLED"] },
+            },
+          },
+          include: {
+            productionPlan: { select: { id: true, style: true, productionDate: true } },
+            material: { select: { name: true, unit: true } },
+            linkedOrder: { select: { id: true, folio: true, estimatedArrivalDate: true, status: true } },
+          },
+          orderBy: { productionPlan: { productionDate: "asc" } },
+        },
+      },
+      orderBy: [{ alertStatus: "asc" }, { material: { name: "asc" } }],
+    });
+    res.json(rows);
+  } catch (e) {
+    next(e);
+  }
 });
 
 // GET /api/inventory/template — download Excel template
@@ -80,9 +101,14 @@ router.get(
 
       const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
       res.setHeader("Content-Disposition", "attachment; filename=inventario_template.xlsx");
-      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
       res.send(buffer);
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
   }
 );
 
@@ -104,7 +130,7 @@ router.post(
       const errors: { row: number; id: string; reason: string }[] = [];
 
       for (let i = 0; i < raw.length; i++) {
-        const rowNum = i + 2; // 1-indexed + header
+        const rowNum = i + 2;
         const row = raw[i];
         const id = String(row["id"] ?? "").trim();
 
@@ -135,9 +161,10 @@ router.post(
         const newStock = stockRaw;
         const daysToOrder = inv.material.supplier?.daysToOrder ?? 7;
         const alertStatus = computeAlertStatus(newStock, newConsumption, inv.reorderPointDays, daysToOrder);
-        const quantityToOrder = newConsumption > 0
-          ? Math.max(0, newConsumption * inv.reorderPointDays - newStock)
-          : 0;
+        const quantityToOrder =
+          newConsumption > 0
+            ? Math.max(0, newConsumption * inv.reorderPointDays - newStock)
+            : 0;
         const estimatedOrderCost = quantityToOrder * inv.material.unitPrice;
 
         await prisma.inventory.update({
@@ -151,11 +178,16 @@ router.post(
             estimatedOrderCost,
           },
         });
+
+        // Sync JIT state (reservedStock + isCritical) after stock change
+        await syncInventoryState(inv.id);
         updated++;
       }
 
       res.json({ updated, errors, total: raw.length });
-    } catch (e) { next(e); }
+    } catch (e) {
+      next(e);
+    }
   }
 );
 
@@ -168,7 +200,9 @@ router.get("/alerts", requireAuth, async (_req: Request, res: Response, next: Ne
       orderBy: [{ alertStatus: "asc" }, { material: { name: "asc" } }],
     });
     res.json(rows);
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 // GET /api/inventory/:materialId
@@ -176,11 +210,27 @@ router.get("/:materialId", requireAuth, async (req: Request, res: Response, next
   try {
     const row = await prisma.inventory.findUnique({
       where: { materialId: req.params.materialId },
-      include: { material: { include: { supplier: true } } },
+      include: {
+        material: { include: { supplier: true } },
+        requirements: {
+          where: {
+            productionPlan: {
+              approvalStatus: "APPROVED",
+              productionStatus: { notIn: ["COMPLETED", "CANCELLED"] },
+            },
+          },
+          include: {
+            productionPlan: { select: { id: true, style: true, productionDate: true } },
+          },
+          orderBy: { productionPlan: { productionDate: "asc" } },
+        },
+      },
     });
     if (!row) return res.status(404).json({ error: "Inventory row not found" });
     res.json(row);
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 // PUT /api/inventory/:materialId
@@ -199,9 +249,10 @@ router.put("/:materialId", requireAuth, async (req: Request, res: Response, next
     const daysToOrder = current.material.supplier?.daysToOrder ?? 7;
 
     const alertStatus = computeAlertStatus(newStock, newConsumption, newReorderDays, daysToOrder);
-    const quantityToOrder = newConsumption > 0
-      ? Math.max(0, newConsumption * newReorderDays - newStock)
-      : 0;
+    const quantityToOrder =
+      newConsumption > 0
+        ? Math.max(0, newConsumption * newReorderDays - newStock)
+        : 0;
     const estimatedOrderCost = quantityToOrder * current.material.unitPrice;
 
     const updated = await prisma.inventory.update({
@@ -209,8 +260,14 @@ router.put("/:materialId", requireAuth, async (req: Request, res: Response, next
       data: { ...updates, alertStatus, quantityToOrder, estimatedOrderCost },
       include: { material: { include: { supplier: true } } },
     });
+
+    // Sync JIT state after stock change
+    await syncInventoryState(current.id);
+
     res.json(updated);
-  } catch (e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 });
 
 export default router;
