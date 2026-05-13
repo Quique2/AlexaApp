@@ -69,10 +69,14 @@ export default function ProductionScreen() {
   const approveMutation = useApproveProductionPlan();
 
   const approvedPlans = (plans ?? []).filter((p) => p.approvalStatus === "APPROVED");
-  // Active: not yet signed off
-  const activePlans = (plans ?? []).filter((p) => !p.signedOffAt);
-  // Historial: signed off
-  const signedOffPlans = (plans ?? []).filter((p) => !!p.signedOffAt);
+  // Active: everything that hasn't finished (COMPLETED) or been cancelled
+  const activePlans = (plans ?? []).filter(
+    (p) => p.productionStatus !== "COMPLETED" && p.productionStatus !== "CANCELLED"
+  );
+  // Historial: only once production is done or cancelled
+  const signedOffPlans = (plans ?? []).filter(
+    (p) => p.productionStatus === "COMPLETED" || p.productionStatus === "CANCELLED"
+  );
 
   const weeklyMalt = approvedPlans.reduce((a, p) => a + p.totalMaltKg, 0);
   const weeklyBatches = approvedPlans.reduce((a, p) => a + p.plannedBatches, 0);

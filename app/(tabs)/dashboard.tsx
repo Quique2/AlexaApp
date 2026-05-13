@@ -117,7 +117,7 @@ export default function DashboardScreen() {
       <View style={styles.kpiRow}>
         <KPICard label="🔴 PEDIR YA" value={s.alerts.red} sub="materiales críticos" accent="red" onPress={() => router.push("/inventory")} />
         <KPICard label="🟡 PEDIR PRONTO" value={s.alerts.yellow} sub="materiales con alerta" accent="yellow" onPress={() => router.push("/inventory")} />
-        <KPICard label="🟢 OK" value={s.alerts.green} sub="materiales en stock" accent="green" />
+        <KPICard label="🟢 OK" value={s.alerts.green + (s.alerts.none ?? 0)} sub="materiales en stock" accent="green" />
       </View>
       {s.alerts.critical > 0 && (
         <Pressable

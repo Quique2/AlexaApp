@@ -299,6 +299,15 @@ router.post(
 
       await reserveStockForPlan(plan.id);
 
+      // Recalculate alert statuses so dashboard reflects the new OK state immediately
+      const affectedInventories = await prisma.productionRequirement.findMany({
+        where: { productionPlanId: plan.id },
+        select: { inventoryId: true },
+      });
+      await Promise.all(
+        affectedInventories.map((r) => recalculateInventoryAlertStatus(r.inventoryId))
+      );
+
       res.json(updated);
     } catch (e) {
       next(e);
