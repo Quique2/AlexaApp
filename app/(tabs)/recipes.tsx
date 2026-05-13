@@ -11,6 +11,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { EmptyState } from "../components/EmptyState";
 import { SectionHeader } from "../components/SectionHeader";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { recipesApi, materialsApi } from "../services/api";
 import type { RecipeLine, Material } from "../types";
 
@@ -46,6 +47,7 @@ export default function RecipesScreen() {
   const [showCreateStyle, setShowCreateStyle] = useState(false);
   const [editing, setEditing] = useState<RecipeLine | null>(null);
   const [fabOpen, setFabOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<RecipeLine | null>(null);
 
   const { data: remoteStyles } = useQuery({
     queryKey: ["recipes-styles"],
@@ -67,16 +69,7 @@ export default function RecipesScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["recipes", selectedStyle] }),
   });
 
-  const handleDelete = (line: RecipeLine) => {
-    Alert.alert(
-      "Eliminar ingrediente",
-      `¿Eliminar ${line.material?.name ?? line.materialId} de la receta?`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Eliminar", style: "destructive", onPress: () => deleteMutation.mutate(line.id) },
-      ]
-    );
-  };
+  const handleDelete = (line: RecipeLine) => setDeleteTarget(line);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
@@ -189,6 +182,22 @@ export default function RecipesScreen() {
           onClose={() => setEditing(null)}
         />
       )}
+
+      <ConfirmModal
+        visible={!!deleteTarget}
+        title="Eliminar ingrediente"
+        message={deleteTarget ? `¿Eliminar ${deleteTarget.material?.name ?? deleteTarget.materialId} de la receta?` : ""}
+        confirmLabel="Eliminar"
+        destructive
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          deleteMutation.mutate(deleteTarget.id, {
+            onSuccess: () => setDeleteTarget(null),
+            onError: () => setDeleteTarget(null),
+          });
+        }}
+      />
     </View>
   );
 }

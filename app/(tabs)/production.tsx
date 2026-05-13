@@ -11,6 +11,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { SectionHeader } from "../components/SectionHeader";
 import { EmptyState } from "../components/EmptyState";
+import { ConfirmModal } from "../components/ConfirmModal";
 import {
   useProductionPlans,
   usePendingProduction,
@@ -53,6 +54,8 @@ export default function ProductionScreen() {
   const [rejectTarget, setRejectTarget] = useState<ProductionPlan | null>(null);
 
   const [showHistory, setShowHistory] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ProductionPlan | null>(null);
+  const [approveTarget, setApproveTarget] = useState<ProductionPlan | null>(null);
 
   const { data: plans, isLoading, refetch, isRefetching } = useProductionPlans();
   const { data: pendingPlans } = usePendingProduction();
@@ -65,39 +68,9 @@ export default function ProductionScreen() {
   const weeklyMalt = approvedPlans.reduce((a, p) => a + p.totalMaltKg, 0);
   const weeklyBatches = approvedPlans.reduce((a, p) => a + p.plannedBatches, 0);
 
-  const handleDelete = (plan: ProductionPlan) => {
-    Alert.alert(
-      "Eliminar plan",
-      `¿Eliminar el lote de ${plan.style} del ${formatDate(plan.productionDate)}?`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar",
-          style: "destructive",
-          onPress: () =>
-            deleteMutation.mutate(plan.id, {
-              onError: (e: any) => Alert.alert("Error al eliminar", e.message),
-            }),
-        },
-      ]
-    );
-  };
+  const handleDelete = (plan: ProductionPlan) => setDeleteTarget(plan);
 
-  const handleApprove = (plan: ProductionPlan) => {
-    Alert.alert(
-      "Aprobar plan",
-      `¿Aprobar ${plan.style} — ${plan.plannedBatches} lote(s)?`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Aprobar",
-          onPress: () => approveMutation.mutate(plan.id, {
-            onError: (e: any) => Alert.alert("Error", e.message),
-          }),
-        },
-      ]
-    );
-  };
+  const handleApprove = (plan: ProductionPlan) => setApproveTarget(plan);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.bg }]}>
@@ -176,6 +149,37 @@ export default function ProductionScreen() {
       {rejectTarget && (
         <RejectModal plan={rejectTarget} onClose={() => setRejectTarget(null)} />
       )}
+
+      <ConfirmModal
+        visible={!!deleteTarget}
+        title="Eliminar plan"
+        message={deleteTarget ? `¿Eliminar el lote de ${deleteTarget.style} del ${formatDate(deleteTarget.productionDate)}?` : ""}
+        confirmLabel="Eliminar"
+        destructive
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          deleteMutation.mutate(deleteTarget.id, {
+            onSuccess: () => setDeleteTarget(null),
+            onError: (e: any) => { setDeleteTarget(null); Alert.alert("Error", e.message); },
+          });
+        }}
+      />
+
+      <ConfirmModal
+        visible={!!approveTarget}
+        title="Aprobar plan"
+        message={approveTarget ? `¿Aprobar ${approveTarget.style} — ${approveTarget.plannedBatches} lote(s)?` : ""}
+        confirmLabel="Aprobar"
+        onCancel={() => setApproveTarget(null)}
+        onConfirm={() => {
+          if (!approveTarget) return;
+          approveMutation.mutate(approveTarget.id, {
+            onSuccess: () => setApproveTarget(null),
+            onError: (e: any) => { setApproveTarget(null); Alert.alert("Error", e.message); },
+          });
+        }}
+      />
     </View>
   );
 }
