@@ -16,11 +16,18 @@ fs.copyFileSync(
 const indexPath = path.join(distDir, "index.html");
 let html = fs.readFileSync(indexPath, "utf8");
 
+// Version stamp forces browsers to re-fetch the favicon even if cached
+const v = Date.now();
+
 html = html.replace(/<title>.*?<\/title>/, "<title>Rrëy: JÏT</title>");
 
+// Remove any existing favicon links (handles both first-run and re-patch)
+html = html.replace(/\s*<link rel="(icon|alternate icon)"[^>]*\/>/g, "");
+
+// Inject fresh favicon links with cache-buster, right before </head>
 html = html.replace(
-  '<link rel="icon" href="/favicon.ico" />',
-  '<link rel="icon" type="image/svg+xml" href="/favicon.svg" />\n  <link rel="alternate icon" href="/favicon.ico" />'
+  "</head>",
+  `  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=${v}" />\n  <link rel="alternate icon" href="/favicon.ico?v=${v}" />\n</head>`
 );
 
 fs.writeFileSync(indexPath, html, "utf8");
