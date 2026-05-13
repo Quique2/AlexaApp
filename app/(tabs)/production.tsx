@@ -125,7 +125,7 @@ export default function ProductionScreen() {
             <PlanCard
               plan={item}
               canApprove={canApprove}
-              onDelete={handleDelete}
+              onDelete={showHistory ? undefined : handleDelete}
               onGenerateOrders={() => setPreviewPlan(item)}
               onApprove={() => handleApprove(item)}
               onReject={() => setRejectTarget(item)}
@@ -249,7 +249,7 @@ function PlanCard({
   plan, canApprove, onDelete, onGenerateOrders, onApprove, onReject,
 }: {
   plan: ProductionPlan; canApprove: boolean;
-  onDelete: (p: ProductionPlan) => void;
+  onDelete?: (p: ProductionPlan) => void;
   onGenerateOrders: () => void;
   onApprove: () => void;
   onReject: () => void;
@@ -333,9 +333,11 @@ function PlanCard({
               <Ionicons name="cart-outline" size={14} color={colors.gold} />
             </Pressable>
           ) : null}
-          <Pressable onPress={() => onDelete(plan)} hitSlop={8}>
-            <Ionicons name="trash-outline" size={14} color={colors.textMuted} />
-          </Pressable>
+          {onDelete && (
+            <Pressable onPress={() => onDelete(plan)} hitSlop={8}>
+              <Ionicons name="trash-outline" size={14} color={colors.textMuted} />
+            </Pressable>
+          )}
         </View>
       </View>
     </View>
@@ -453,6 +455,7 @@ function GenerateOrdersModal({ plan, onClose }: { plan: ProductionPlan; onClose:
       const result = await recipesApi.confirmOrders(plan.id);
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["production"] });
       Alert.alert(
         "Pedidos generados",
         `${result.created.length} pedido(s) creado(s). ${result.skipped} material(es) con stock suficiente.`,
