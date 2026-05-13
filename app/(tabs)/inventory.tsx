@@ -22,7 +22,7 @@ const ALERT_FILTERS = [
   { label: "Todos", value: "" },
   { label: "🔴 Pedir ya", value: "RED" },
   { label: "🟡 Pedir pronto", value: "YELLOW" },
-  { label: "🟢 OK", value: "GREEN" },
+  { label: "🟢 OK", value: "OK_RESERVED" },
   { label: "⚠ Crítico", value: "CRITICAL" },
 ];
 const TYPE_FILTERS = [
@@ -69,7 +69,8 @@ export default function InventoryScreen() {
 
   const params = useMemo(
     () => ({
-      alert: alertFilter && alertFilter !== "CRITICAL" ? alertFilter : undefined,
+      // OK_RESERVED and CRITICAL are frontend-only filters — fetch all and filter client-side
+      alert: alertFilter && alertFilter !== "CRITICAL" && alertFilter !== "OK_RESERVED" ? alertFilter : undefined,
       type: typeFilter || undefined,
     }),
     [alertFilter, typeFilter]
@@ -81,6 +82,7 @@ export default function InventoryScreen() {
     if (!data) return [];
     let result = data;
     if (alertFilter === "CRITICAL") result = result.filter((r) => r.isCritical);
+    if (alertFilter === "OK_RESERVED") result = result.filter((r) => (r.reservedStock ?? 0) > 0);
     if (search) {
       const q = search.toLowerCase();
       result = result.filter((r) => r.material?.name.toLowerCase().includes(q));
