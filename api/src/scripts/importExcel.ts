@@ -75,10 +75,7 @@ async function importCatalog(workbook: XLSX.WorkBook) {
     await prisma.inventory.upsert({
       where: { materialId: id },
       update: {},
-      create: {
-        materialId: id,
-        reorderPointDays: supplierId === "P2" ? 12 : supplierId === "P3" ? 10 : 7,
-      },
+      create: { materialId: id },
     });
 
     created++;
@@ -108,14 +105,13 @@ async function importInventory(workbook: XLSX.WorkBook) {
     if (!materialId.startsWith("I")) continue;
 
     const currentStock = parseFloat(String(row.stock ?? "0")) || 0;
-    const dailyConsumption = parseFloat(String(row.consumption ?? "0")) || 0;
 
     const inv = await prisma.inventory.findUnique({ where: { materialId } });
     if (!inv) continue;
 
     await prisma.inventory.update({
       where: { materialId },
-      data: { currentStock, dailyConsumption },
+      data: { currentStock },
     });
     updated++;
   }

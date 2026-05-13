@@ -56,7 +56,7 @@ router.post(
     try {
       const data = MaterialSchema.parse(req.body);
       const material = await prisma.material.create({ data, include: { supplier: true } });
-      await prisma.inventory.create({ data: { materialId: material.id, reorderPointDays: 7 } });
+      await prisma.inventory.create({ data: { materialId: material.id } });
       res.status(201).json(material);
     } catch (e) { next(e); }
   }
