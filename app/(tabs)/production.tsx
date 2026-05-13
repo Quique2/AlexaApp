@@ -5,7 +5,7 @@ import {
   ActivityIndicator, RefreshControl, Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { spacing, radius, Colors } from "../constants/theme";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
@@ -21,15 +21,11 @@ import {
   useRejectProductionPlan,
   useSignOffProductionPlan,
 } from "../hooks/useProduction";
-import { recipesApi } from "../services/api";
+import { recipesApi, stylesApi } from "../services/api";
+import { StyleImage } from "../components/StyleImage";
 import { fmt } from "../utils/fmt";
 import type { ProductionPlan, GenerateOrdersPreview } from "../types";
 
-const STYLES = ["Löndon", "Whïte", "Kölsh", "Mëxican IPA", "Monterrëy Stout", "Edición especial"];
-const STYLE_EMOJIS: Record<string, string> = {
-  "Löndon": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Whïte": "🌾", "Kölsh": "🇩🇪",
-  "Mëxican IPA": "🌶️", "Monterrëy Stout": "⚫", "Edición especial": "✨",
-};
 const MXN = (n: number) =>
   n.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
 
@@ -220,12 +216,15 @@ function PendingPlanRow({
   plan: ProductionPlan; colors: Colors; typography: any;
   onApprove: () => void; onReject: () => void;
 }) {
+  const { data: stylesData } = useQuery({ queryKey: ["styles"], queryFn: stylesApi.list });
+  const imageUri = stylesData?.find((s) => s.name === plan.style)?.imageUri ?? null;
   return (
     <View style={[pendingStyles.row, { borderTopColor: colors.border }]}>
       <View style={pendingStyles.info}>
-        <Text style={[typography.h4, { fontSize: 13 }]}>
-          {STYLE_EMOJIS[plan.style] ?? "🍺"} {plan.style}
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.xs }}>
+          <StyleImage name={plan.style} imageUri={imageUri} size={20} />
+          <Text style={[typography.h4, { fontSize: 13 }]}>{plan.style}</Text>
+        </View>
         <Text style={typography.caption}>
           {plan.plannedBatches} lote(s) · {formatDate(plan.productionDate)}
         </Text>
@@ -273,6 +272,8 @@ function PlanCard({
   onReject: () => void;
 }) {
   const { colors, typography } = useTheme();
+  const { data: stylesData } = useQuery({ queryKey: ["styles"], queryFn: stylesApi.list });
+  const imageUri = stylesData?.find((s) => s.name === plan.style)?.imageUri ?? null;
   const days = daysFromNow(plan.productionDate);
   const isToday = days === "HOY" || days === "MAÑANA";
   const isSignedOff = !!plan.signedOffAt;
@@ -288,7 +289,7 @@ function PlanCard({
   return (
     <View style={[planCardStyles.card, { borderBottomColor: colors.border }, isToday && !isPending && { backgroundColor: colors.surface }]}>
       <View style={planCardStyles.left}>
-        <Text style={planCardStyles.emoji}>{STYLE_EMOJIS[plan.style] ?? "🍺"}</Text>
+        <StyleImage name={plan.style} imageUri={imageUri} size={30} />
         <View style={{ gap: 2 }}>
           <Text style={[typography.h4, { fontSize: 14 }]}>{plan.style}</Text>
           <Text style={typography.caption}>{formatDate(plan.productionDate)}</Text>
@@ -390,7 +391,6 @@ const planCardStyles = StyleSheet.create({
     borderBottomWidth: 1, gap: spacing.sm,
   },
   left: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flex: 1 },
-  emoji: { fontSize: 22, width: 30 },
   mid: { alignItems: "flex-end", marginRight: spacing.sm },
   right: { alignItems: "flex-end", gap: spacing.xs },
   actions: { flexDirection: "row", gap: spacing.xs, alignItems: "center" },
@@ -477,6 +477,8 @@ function RejectModal({ plan, onClose }: { plan: ProductionPlan; onClose: () => v
 function GenerateOrdersModal({ plan, onClose }: { plan: ProductionPlan; onClose: () => void }) {
   const { colors, typography } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { data: stylesData } = useQuery({ queryKey: ["styles"], queryFn: stylesApi.list });
+  const styleImageUri = stylesData?.find((s) => s.name === plan.style)?.imageUri ?? null;
 
   const [preview, setPreview] = useState<GenerateOrdersPreview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -529,9 +531,10 @@ function GenerateOrdersModal({ plan, onClose }: { plan: ProductionPlan; onClose:
           <View style={[styles.handle, { backgroundColor: colors.border }]} />
           <View style={styles.sheetHeader}>
             <View>
-              <Text style={[typography.h3, { marginBottom: 2 }]}>
-                {STYLE_EMOJIS[plan.style] ?? "🍺"} {plan.style}
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: 2 }}>
+                <StyleImage name={plan.style} imageUri={styleImageUri} size={28} />
+                <Text style={typography.h3}>{plan.style}</Text>
+              </View>
               <Text style={typography.caption}>
                 {plan.plannedBatches} lote{plan.plannedBatches > 1 ? "s" : ""} · {formatDate(plan.productionDate)}
               </Text>
@@ -670,8 +673,13 @@ function PlanForm({ onClose }: { onClose: () => void }) {
   const { colors, typography } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const createMutation = useCreateProductionPlan();
+  const { data: stylesData } = useQuery({ queryKey: ["styles"], queryFn: stylesApi.list });
+  const styleList = stylesData ?? [];
 
-  const [selectedStyle, setSelectedStyle] = useState(STYLES[0]);
+  const [selectedStyle, setSelectedStyle] = useState<string>("");
+  React.useEffect(() => {
+    if (styleList.length > 0 && !selectedStyle) setSelectedStyle(styleList[0].name);
+  }, [styleList.length]);
   const [date, setDate] = useState(() => {
     const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10);
   });
@@ -712,14 +720,19 @@ function PlanForm({ onClose }: { onClose: () => void }) {
             <Text style={[typography.label, { marginBottom: 4 }]}>ESTILO</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.md }}>
               <View style={{ flexDirection: "row", gap: spacing.xs }}>
-                {STYLES.map((s) => (
+                {styleList.map((s) => (
                   <Pressable
-                    key={s}
-                    style={[styles.styleChip, { borderColor: colors.border, backgroundColor: colors.card }, s === selectedStyle && { borderColor: colors.gold }]}
-                    onPress={() => setSelectedStyle(s)}
+                    key={s.name}
+                    style={[
+                      styles.styleChip,
+                      { borderColor: colors.border, backgroundColor: colors.card, flexDirection: "row", alignItems: "center", gap: spacing.xs },
+                      s.name === selectedStyle && { borderColor: colors.gold },
+                    ]}
+                    onPress={() => setSelectedStyle(s.name)}
                   >
-                    <Text style={[typography.bodySmall, { color: s === selectedStyle ? colors.gold : colors.textSecondary }]}>
-                      {STYLE_EMOJIS[s]} {s}
+                    <StyleImage name={s.name} imageUri={s.imageUri} size={20} />
+                    <Text style={[typography.bodySmall, { color: s.name === selectedStyle ? colors.gold : colors.textSecondary }]}>
+                      {s.name}
                     </Text>
                   </Pressable>
                 ))}

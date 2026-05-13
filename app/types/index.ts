@@ -149,6 +149,11 @@ export interface Reception {
   createdAt: string;
 }
 
+export interface StyleMeta {
+  name: string;
+  imageUri: string | null;
+}
+
 export interface RecipeLine {
   id: string;
   beerStyle: string;

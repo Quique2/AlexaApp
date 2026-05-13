@@ -238,6 +238,23 @@ export const receptionsApi = {
     request<Reception>("/receptions", { method: "POST", body: JSON.stringify(data) }),
 };
 
+// ─── Styles ──────────────────────────────────────────────────────────────────
+export const stylesApi = {
+  list: () => request<{ name: string; imageUri: string | null }[]>("/styles"),
+  upsert: (name: string, imageUri?: string | null) =>
+    request<{ name: string; imageUri: string | null }>("/styles", {
+      method: "POST",
+      body: JSON.stringify({ name, imageUri }),
+    }),
+  update: (oldName: string, data: { name?: string; imageUri?: string | null }) =>
+    request<{ name: string; imageUri: string | null }>(`/styles/${encodeURIComponent(oldName)}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  delete: (name: string) =>
+    request<void>(`/styles/${encodeURIComponent(name)}`, { method: "DELETE" }),
+};
+
 // ─── Recipes ─────────────────────────────────────────────────────────────────
 export const recipesApi = {
   styles: () => request<string[]>("/recipes/styles"),

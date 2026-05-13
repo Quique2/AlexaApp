@@ -9,6 +9,7 @@ import suppliersRouter from "./suppliers";
 import dashboardRouter from "./dashboard";
 import configRouter from "./config";
 import recipesRouter from "./recipes";
+import stylesRouter from "./styles";
 import usersRouter from "./users";
 import adminRouter from "./admin";
 
@@ -24,6 +25,7 @@ router.use("/suppliers", suppliersRouter);
 router.use("/dashboard", dashboardRouter);
 router.use("/config", configRouter);
 router.use("/recipes", recipesRouter);
+router.use("/styles", stylesRouter);
 router.use("/users", usersRouter);
 router.use("/admin", adminRouter);
 

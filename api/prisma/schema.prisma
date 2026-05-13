@@ -299,3 +299,12 @@ model BlockedEntity {
   @@unique([type, value])
   @@map("blocked_entities")
 }
+
+model StyleMeta {
+  name      String   @id
+  imageUri  String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("style_meta")
+}

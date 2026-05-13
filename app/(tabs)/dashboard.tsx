@@ -9,24 +9,19 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import { spacing, radius, Colors } from "../constants/theme";
 import { useTheme } from "../context/ThemeContext";
 import { EmptyState } from "../components/EmptyState";
 import { useDashboardSummary } from "../hooks/useDashboard";
 import { useInventoryAlerts } from "../hooks/useInventory";
+import { stylesApi } from "../services/api";
+import { StyleImage } from "../components/StyleImage";
 import type { InventoryRow } from "../types";
 
 const MXN = (n: number) =>
   n.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
 
-const STYLE_EMOJIS: Record<string, string> = {
-  "Löndon": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
-  "Whïte": "🌾",
-  "Kölsh": "🇩🇪",
-  "Mëxican IPA": "🌶️",
-  "Monterrëy Stout": "⚫",
-  "Edición especial": "✨",
-};
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -297,6 +292,8 @@ function PlanRow({
 }: {
   plan: any; colors: Colors; typography: any; isLast: boolean;
 }) {
+  const { data: stylesData } = useQuery({ queryKey: ["styles"], queryFn: stylesApi.list });
+  const imageUri = stylesData?.find((s) => s.name === plan.style)?.imageUri ?? null;
   const date = new Date(plan.productionDate).toLocaleDateString("es-MX", {
     weekday: "short",
     day: "numeric",
@@ -304,9 +301,7 @@ function PlanRow({
   });
   return (
     <View style={[rowStyles.row, !isLast && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
-      <Text style={{ fontSize: 20, width: 32, textAlign: "center" }}>
-        {STYLE_EMOJIS[plan.style] ?? "🍺"}
-      </Text>
+      <StyleImage name={plan.style} imageUri={imageUri} size={28} />
       <View style={{ flex: 1 }}>
         <Text style={[typography.h4, { fontSize: 13 }]} numberOfLines={1}>{plan.style}</Text>
         <Text style={typography.caption}>
