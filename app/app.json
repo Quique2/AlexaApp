@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "Rrëy",
+    "owner": "quiqueexpo",
     "slug": "rrey-app",
     "version": "1.0.0",
     "orientation": "portrait",
