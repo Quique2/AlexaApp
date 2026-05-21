@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rrëy: JÏT — Instructivo de Usuarios</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700;900&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0C0C0C; --bg2: #141414; --bg3: #1c1c1c; --bg4: #202020;
+    --gold: #c9963a; --gold2: #e8b455; --gold3: #f5d080;
+    --white: #f0efe9; --muted: #777; --border: rgba(201,150,58,0.18); --border2: #222;
+    --green: #22c55e; --red: #ef4444; --orange: #f97316; --yellow: #eab308;
+    --blue: #3b82f6; --purple: #a855f7;
+    --sup: #3b82f6; --op: #22c55e; --trans: #a855f7;
+  }
+
+  body { background: var(--bg); color: var(--white); font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.7; }
+
+  @media print {
+    body { background: #fff; color: #111; padding-top: 0 !important; }
+    .no-print { display: none !important; }
+    .print-break { page-break-before: always; }
+    .cover, .role-banner { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .step-card, .section-card, .note-box { background: #fafafa !important; border-color: #e0e0e0 !important; }
+    .step-num { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .coming-soon { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
+  /* ── PRINT BAR ── */
+  .print-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(14,14,14,.96); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border); padding: 10px 40px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .print-bar-title { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .print-bar-title span { color: var(--white); }
+  .btn-print { background: linear-gradient(135deg, var(--gold), #a06b1a); color: #0C0C0C; font-weight: 700; font-size: 13px; padding: 7px 18px; border-radius: 20px; border: none; cursor: pointer; font-family: 'Inter', sans-serif; }
+  body { padding-top: 52px; }
+
+  /* ── PAGE ── */
+  .page { max-width: 900px; margin: 0 auto; }
+
+  /* ── COVER ── */
+  .cover {
+    background: var(--bg); padding: 72px 80px 60px; position: relative; overflow: hidden;
+    border-bottom: 1px solid var(--border);
+  }
+  .cover-grid { position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(201,150,58,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(201,150,58,.025) 1px, transparent 1px); background-size: 48px 48px; }
+  .cover-glow { position: absolute; bottom: -30%; left: -10%; width: 500px; height: 500px; border-radius: 50%; background: radial-gradient(circle, rgba(201,150,58,.06) 0%, transparent 65%); pointer-events: none; }
+  .cover-content { position: relative; z-index: 1; }
+  .doc-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: var(--gold); margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .doc-eyebrow::before { content: ''; display: block; width: 24px; height: 1px; background: var(--gold); }
+  .cover-logo { font-family: 'Playfair Display', serif; font-size: 58px; font-weight: 900; letter-spacing: -2px; line-height: 1; }
+  .cover-logo span { background: linear-gradient(135deg, var(--gold3), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .cover-sub { font-size: 19px; color: var(--muted); margin: 8px 0 28px; font-weight: 400; }
+  .cover-desc { font-size: 14px; color: #999; line-height: 1.8; max-width: 560px; margin-bottom: 40px; }
+  .cover-roles { display: flex; gap: 12px; flex-wrap: wrap; }
+  .cover-role-pill {
+    display: flex; align-items: center; gap: 8px; padding: 10px 18px;
+    border-radius: 50px; border: 1px solid; font-size: 13px; font-weight: 700;
+  }
+  .cover-role-pill.sup { border-color: rgba(59,130,246,.4); color: #93c5fd; background: rgba(59,130,246,.08); }
+  .cover-role-pill.op { border-color: rgba(34,197,94,.4); color: #86efac; background: rgba(34,197,94,.07); }
+  .cover-role-pill.trans { border-color: rgba(168,85,247,.4); color: #d8b4fe; background: rgba(168,85,247,.07); opacity:.7; }
+
+  /* ── BODY ── */
+  .body { padding: 0 80px 64px; }
+
+  /* ── ROLE BANNER ── */
+  .role-banner {
+    padding: 40px 80px 32px; margin: 0 -80px; border-bottom: 1px solid var(--border2);
+    border-top: 1px solid var(--border2);
+  }
+  .role-banner.sup { background: linear-gradient(135deg, rgba(59,130,246,.06) 0%, transparent 60%); }
+  .role-banner.op { background: linear-gradient(135deg, rgba(34,197,94,.05) 0%, transparent 60%); }
+  .role-banner.trans { background: linear-gradient(135deg, rgba(168,85,247,.06) 0%, transparent 60%); }
+  .role-banner-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; margin-bottom: 10px; }
+  .role-banner-eyebrow.sup { color: var(--sup); }
+  .role-banner-eyebrow.op { color: var(--op); }
+  .role-banner-eyebrow.trans { color: var(--trans); }
+  .role-banner h2 { font-family: 'Playfair Display', serif; font-size: 34px; font-weight: 700; margin-bottom: 6px; }
+  .role-banner p { font-size: 14px; color: var(--muted); }
+  .role-scope { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+  .scope-pill { font-size: 11px; font-weight: 600; padding: 4px 12px; border-radius: 20px; }
+  .scope-pill.sup { background: rgba(59,130,246,.12); color: #93c5fd; border: 1px solid rgba(59,130,246,.25); }
+  .scope-pill.op { background: rgba(34,197,94,.1); color: #86efac; border: 1px solid rgba(34,197,94,.2); }
+
+  /* ── SECTION ── */
+  .section { margin: 36px 0; }
+  .section-label { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border2); }
+
+  /* ── STEPS ── */
+  .steps { display: flex; flex-direction: column; gap: 10px; }
+  .step-card {
+    display: flex; gap: 16px; background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: 14px; padding: 18px 20px; align-items: flex-start;
+    transition: border-color .2s;
+  }
+  .step-card:hover { border-color: #333; }
+  .step-num {
+    width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; flex-shrink: 0; margin-top: 1px;
+  }
+  .step-num.sup { background: rgba(59,130,246,.15); color: #93c5fd; }
+  .step-num.op { background: rgba(34,197,94,.12); color: #86efac; }
+  .step-num.trans { background: rgba(168,85,247,.15); color: #d8b4fe; }
+  .step-body { flex: 1; }
+  .step-title { font-size: 14px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+  .step-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .step-desc strong { color: #ccc; }
+  .step-tip { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; padding: 10px 12px; background: var(--bg3); border-radius: 8px; font-size: 12px; color: #888; line-height: 1.5; }
+  .step-tip strong { color: var(--gold2); }
+
+  /* ── NOTE BOX ── */
+  .note-box { background: var(--bg2); border: 1px solid var(--border2); border-radius: 12px; padding: 18px 20px; margin: 14px 0; font-size: 13px; color: var(--muted); line-height: 1.7; }
+  .note-box strong { color: var(--white); }
+  .note-box.warn { border-left: 3px solid var(--orange); border-radius: 0 12px 12px 0; background: rgba(249,115,22,.05); }
+  .note-box.info { border-left: 3px solid var(--sup); border-radius: 0 12px 12px 0; background: rgba(59,130,246,.05); }
+  .note-box.ok { border-left: 3px solid var(--green); border-radius: 0 12px 12px 0; background: rgba(34,197,94,.04); }
+
+  /* ── SECTION CARD ── */
+  .section-card { background: var(--bg2); border: 1px solid var(--border2); border-radius: 14px; padding: 20px 22px; margin-bottom: 12px; }
+
+  /* ── PERMISSION TABLE ── */
+  .perm-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  .perm-table th { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border2); }
+  .perm-table td { font-size: 13px; color: #a0a0a0; padding: 10px 12px; border-bottom: 1px solid #1a1a1a; }
+  .perm-table tr:last-child td { border-bottom: none; }
+  .perm-table td:first-child { color: var(--white); font-weight: 500; }
+  .yes { color: var(--green); font-weight: 700; }
+  .no { color: #444; }
+  .limited { color: var(--yellow); font-weight: 600; font-size: 12px; }
+
+  /* ── ALERT MINI ── */
+  .alert-mini { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 6px; }
+  .alert-mini.c { background: rgba(239,68,68,.08); color: #f87171; border: 1px solid rgba(239,68,68,.15); }
+  .alert-mini.u { background: rgba(249,115,22,.08); color: #fb923c; border: 1px solid rgba(249,115,22,.15); }
+  .alert-mini.y { background: rgba(234,179,8,.07); color: #facc15; border: 1px solid rgba(234,179,8,.15); }
+  .alert-mini.g { background: rgba(34,197,94,.06); color: #4ade80; border: 1px solid rgba(34,197,94,.12); }
+  .alert-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .alert-dot.c { background: var(--red); }
+  .alert-dot.u { background: var(--orange); }
+  .alert-dot.y { background: var(--yellow); }
+  .alert-dot.g { background: var(--green); }
+
+  /* ── COMING SOON ── */
+  .coming-soon {
+    background: linear-gradient(135deg, rgba(168,85,247,.08), rgba(168,85,247,.03));
+    border: 1.5px dashed rgba(168,85,247,.35); border-radius: 18px;
+    padding: 40px; margin: 40px 0; text-align: center;
+    position: relative; overflow: hidden;
+  }
+  .coming-soon::before { content: '🚧'; position: absolute; top: 16px; right: 20px; font-size: 20px; opacity: .4; }
+  .coming-soon-badge { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--trans); border: 1px solid rgba(168,85,247,.3); padding: 4px 12px; border-radius: 20px; margin-bottom: 16px; background: rgba(168,85,247,.08); }
+  .coming-soon h3 { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; color: var(--white); margin-bottom: 8px; }
+  .coming-soon p { font-size: 14px; color: var(--muted); line-height: 1.7; max-width: 520px; margin: 0 auto 24px; }
+  .trans-feature { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #d8b4fe; background: rgba(168,85,247,.1); border: 1px solid rgba(168,85,247,.2); padding: 5px 12px; border-radius: 20px; margin: 4px; }
+
+  /* ── DIVIDER ── */
+  .divider { height: 1px; background: var(--border2); margin: 40px 0; }
+
+  /* ── TOC ── */
+  .toc { padding: 32px 80px; border-bottom: 1px solid var(--border2); background: var(--bg2); }
+  .toc-title { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--gold); margin-bottom: 16px; }
+  .toc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  .toc-item { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid #1c1c1c; font-size: 13px; }
+  .toc-item:last-child { border-bottom: none; }
+  .toc-role { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .toc-role.sup { background: var(--sup); }
+  .toc-role.op { background: var(--op); }
+  .toc-role.trans { background: var(--trans); }
+  .toc-name { color: var(--muted); flex: 1; }
+
+  /* ── FOOTER ── */
+  .doc-footer { margin: 48px 0 0; padding: 20px 0; border-top: 1px solid var(--border2); display: flex; justify-content: space-between; }
+  .doc-footer span { font-size: 11px; color: #333; }
+</style>
+</head>
+<body>
+
+<div class="print-bar no-print">
+  <div class="print-bar-title">Instructivo de Usuarios — <span>Rrëy: JÏT</span></div>
+  <button class="btn-print" onclick="window.print()">Imprimir / Exportar PDF</button>
+</div>
+
+<div class="page">
+
+  <!-- ══ COVER ══════════════════════════════════════════════════ -->
+  <div class="cover">
+    <div class="cover-grid"></div>
+    <div class="cover-glow"></div>
+    <div class="cover-content">
+      <div class="doc-eyebrow">Instructivo de Usuarios · Rrëy: JÏT</div>
+      <div class="cover-logo">Manual <span>Operativo</span></div>
+      <div class="cover-sub">Guía paso a paso para Supervisores y Operadores</div>
+      <div class="cover-desc">
+        Este documento contiene las instrucciones detalladas para cada acción que un Supervisor u Operador puede realizar dentro de la aplicación Rrëy: JÏT. Incluye también una vista previa del rol de Transportista, actualmente en desarrollo.
+      </div>
+      <div class="cover-roles">
+        <div class="cover-role-pill sup">🔵 Supervisor</div>
+        <div class="cover-role-pill op">🟢 Operador</div>
+        <div class="cover-role-pill trans">🟣 Transportista · En desarrollo</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ TOC ════════════════════════════════════════════════════ -->
+  <div class="toc">
+    <div class="toc-title">Contenido</div>
+    <div class="toc-grid">
+      <div>
+        <div class="toc-item"><div class="toc-role sup"></div><div class="toc-name">Acceso e inicio de sesión</div></div>
+        <div class="toc-item"><div class="toc-role sup"></div><div class="toc-name">Supervisor — Dashboard</div></div>
+        <div class="toc-item"><div class="toc-role sup"></div><div class="toc-name">Supervisor — Inventario</div></div>
+        <div class="toc-item"><div class="toc-role sup"></div><div class="toc-name">Supervisor — Producción</div></div>
+        <div class="toc-item"><div class="toc-role sup"></div><div class="toc-name">Supervisor — Recetas y Estilos</div></div>
+        <div class="toc-item"><div class="toc-role sup"></div><div class="toc-name">Supervisor — Órdenes de Compra</div></div>
+      </div>
+      <div>
+        <div class="toc-item"><div class="toc-role op"></div><div class="toc-name">Operador — Dashboard</div></div>
+        <div class="toc-item"><div class="toc-role op"></div><div class="toc-name">Operador — Consulta de Inventario</div></div>
+        <div class="toc-item"><div class="toc-role op"></div><div class="toc-name">Operador — Recepción de Pedidos</div></div>
+        <div class="toc-item"><div class="toc-role op"></div><div class="toc-name">Operador — Consulta de Producción</div></div>
+        <div class="toc-item"><div class="toc-role trans"></div><div class="toc-name">Transportista — Próximamente</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- ══ ACCESO ══════════════════════════════════════════════ -->
+    <div class="section" style="margin-top:40px;">
+      <div class="section-label">Acceso a la aplicación</div>
+
+      <div class="section-card" style="margin-bottom:16px;">
+        <div style="font-size:14px; font-weight:700; color:var(--white); margin-bottom:12px;">Primer inicio de sesión</div>
+        <div class="steps">
+          <div class="step-card">
+            <div class="step-num sup">1</div>
+            <div class="step-body">
+              <div class="step-title">Abrir la aplicación</div>
+              <div class="step-desc">En iPhone o Android: abrir la app <strong>Rrëy: JÏT</strong> instalada en el dispositivo. En computadora: acceder al enlace web proporcionado por el administrador.</div>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num sup">2</div>
+            <div class="step-body">
+              <div class="step-title">Ingresar credenciales</div>
+              <div class="step-desc">Escribir el <strong>correo electrónico</strong> y <strong>contraseña</strong> asignados por el Administrador. Tocar <strong>"Iniciar sesión"</strong>.</div>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num sup">3</div>
+            <div class="step-body">
+              <div class="step-title">Activar acceso biométrico (recomendado)</div>
+              <div class="step-desc">Ir a <strong>Configuración → Seguridad → Activar huella / Face ID</strong>. A partir de entonces, podrá entrar a la app sin escribir la contraseña.</div>
+              <div class="step-tip">💡 <span><strong>Recomendado:</strong> Activar la biometría facilita el acceso rápido desde el área de producción sin necesidad de escribir contraseñas.</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="note-box info">
+        <strong>Cambio de contraseña:</strong> Si el Administrador asignó una contraseña temporal, cámbiela en <strong>Configuración → Cuenta → Cambiar contraseña</strong> en su primer inicio de sesión.
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════
+         SECCIÓN SUPERVISOR
+    ══════════════════════════════════════════════════════════════ -->
+    <div class="print-break"></div>
+    <div class="role-banner sup">
+      <div class="role-banner-eyebrow sup">Rol</div>
+      <h2>Supervisor</h2>
+      <p>Acceso operativo completo. Puede crear, editar y gestionar toda la operación excepto la administración de usuarios.</p>
+      <div class="role-scope">
+        <span class="scope-pill sup">Dashboard</span>
+        <span class="scope-pill sup">Inventario completo</span>
+        <span class="scope-pill sup">Planes de producción</span>
+        <span class="scope-pill sup">Recetas y estilos</span>
+        <span class="scope-pill sup">Órdenes de compra</span>
+        <span class="scope-pill sup">Recepciones</span>
+      </div>
+    </div>
+
+    <!-- SUP: DASHBOARD -->
+    <div class="section">
+      <div class="section-label">1 · Dashboard</div>
+      <div class="note-box ok" style="margin-bottom:16px;">
+        El Dashboard es la <strong>primera pantalla al abrir la app</strong>. Muestra el estado general de la operación en tiempo real. Como Supervisor, debe revisarlo al inicio de cada jornada.
+      </div>
+      <div class="steps">
+        <div class="step-card">
+          <div class="step-num sup">→</div>
+          <div class="step-body">
+            <div class="step-title">Leer los KPIs superiores</div>
+            <div class="step-desc">Los cuatro indicadores en la parte alta muestran: <strong>valor del inventario</strong>, <strong>alertas activas</strong>, <strong>planes próximos</strong> y <strong>órdenes en tránsito</strong>. Si el número de alertas es mayor a 0, revisarlas de inmediato.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num sup">→</div>
+          <div class="step-body">
+            <div class="step-title">Revisar la franja de alertas JÏT</div>
+            <div class="step-desc">Debajo de los KPIs aparece una tira con los ingredientes que tienen alerta activa. El color indica la urgencia:</div>
+            <div style="margin-top:10px;">
+              <div class="alert-mini c"><div class="alert-dot c"></div><strong>CRÍTICO —</strong> Acción inmediata. El ingrediente ya no llegará a tiempo.</div>
+              <div class="alert-mini u"><div class="alert-dot u"></div><strong>URGENTE —</strong> Ordenar hoy. Quedan menos días que el tiempo de entrega del proveedor.</div>
+              <div class="alert-mini y"><div class="alert-dot y"></div><strong>CON MARGEN —</strong> Planificar el pedido. Aún hay tiempo suficiente.</div>
+              <div class="alert-mini g"><div class="alert-dot g"></div><strong>OK —</strong> Sin acción requerida.</div>
+            </div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num sup">→</div>
+          <div class="step-body">
+            <div class="step-title">Revisar los planes de producción próximos</div>
+            <div class="step-desc">La parte inferior muestra los planes de producción de los próximos 7 días. Tocar cualquiera para ver su detalle y el estado de cada ingrediente requerido.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUP: INVENTARIO -->
+    <div class="section">
+      <div class="section-label">2 · Gestión de Inventario</div>
+      <div class="steps">
+        <div class="step-card">
+          <div class="step-num sup">A</div>
+          <div class="step-body">
+            <div class="step-title">Ver el inventario completo</div>
+            <div class="step-desc">Tocar la pestaña <strong>Inventario</strong> en la barra inferior. Aparece la lista de todos los ingredientes con su cantidad actual y alerta de color. Usar la <strong>barra de búsqueda</strong> para encontrar un ingrediente por nombre, o los <strong>filtros</strong> para ver solo lúpulos, maltas, levaduras, etc.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num sup">B</div>
+          <div class="step-body">
+            <div class="step-title">Agregar un ingrediente nuevo</div>
+            <div class="step-desc">Tocar el botón <strong>＋</strong> (esquina inferior derecha) → <strong>Nuevo ingrediente</strong>. Completar: nombre, tipo (lúpulo/malta/levadura/adjunto/otro), cantidad inicial, unidad de medida, precio unitario y proveedor asignado. Confirmar con <strong>"Guardar"</strong>.</div>
+            <div class="step-tip">💡 <span>Asignar siempre un <strong>proveedor con tiempo de entrega</strong> para que el sistema JÏT pueda calcular alertas correctamente.</span></div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num sup">C</div>
+          <div class="step-body">
+            <div class="step-title">Editar o ajustar un ingrediente</div>
+            <div class="step-desc">Tocar el ingrediente en la lista para abrir su detalle. Tocar el ícono de <strong>editar (lápiz)</strong> para modificar cantidad, precio, proveedor o cualquier otro dato. Confirmar con <strong>"Guardar"</strong>.</div>
+            <div class="step-tip">⚠️ <span><strong>Ajustes de inventario:</strong> Si hay una discrepancia entre lo que muestra la app y el stock real, usar la opción <strong>"Ajustar cantidad"</strong> para corregirlo y dejar el registro exacto.</span></div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num sup">D</div>
+          <div class="step-body">
+            <div class="step-title">Importar inventario desde Excel (CSV)</div>
+            <div class="step-desc">Desde la web, tocar el botón <strong>"Importar"</strong> → descargar la plantilla CSV → llenarla con los ingredientes → subir el archivo. El sistema valida los datos antes de importar masivamente.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUP: PRODUCCIÓN -->
+    <div class="section">
+      <div class="section-label">3 · Planificación de Producción</div>
+      <div class="steps">
+        <div class="step-card">
+          <div class="step-num sup">A</div>
+          <div class="step-body">
+            <div class="step-title">Crear un nuevo plan de producción</div>
+            <div class="step-desc">Ir a la pestaña <strong>Producción</strong> → tocar <strong>＋ Nuevo plan</strong>. Seleccionar el <strong>estilo de cerveza</strong>, la <strong>fecha de producción</strong> y el <strong>número de lotes</strong>. El sistema calcula automáticamente los ingredientes necesarios según la receta. Confirmar con <strong>"Crear plan"</strong>.</div>
+            <div class="step-tip">💡 <span>Al crear el plan, la app mostrará de inmediato el estado JÏT de cada ingrediente requerido para esa fecha.</span></div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num sup">B</div>
+          <div class="step-body">
+            <div class="step-title">Revisar el estado de ingredientes de un plan</div>
+            <div class="step-desc">Tocar cualquier plan en la lista → tocar <strong>"Ver ingredientes"</strong> o el ícono de alerta. Se abre un modal con cada ingrediente del plan y su estado JÏT: si hay que ordenarlo ya, si está en tránsito, si hay stock suficiente o si ya es crítico.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num sup">C</div>
+          <div class="step-body">
+            <div class="step-title">Generar órdenes de compra desde un plan</div>
+            <div class="step-desc">Dentro del detalle del plan → tocar <strong>"Generar órdenes"</strong>. El sistema analiza el stock disponible vs. lo necesario y presenta la lista exacta de ingredientes a pedir, con proveedor y cantidad. Confirmar para crear las órdenes automáticamente.</div>
+            <div class="step-tip">💡 <span>Esta función elimina el cálculo manual. Puede usarse una vez por plan para generar todos los pedidos necesarios de una sola vez.</span></div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num sup">D</div>
+          <div class="step-body">
+            <div class="step-title">Marcar un plan como completado</div>
+            <div class="step-desc">Cuando el lote de producción termina, ir al plan → tocar <strong>"Marcar como completado"</strong>. El sistema descuenta automáticamente los ingredientes utilizados del inventario. Este paso es fundamental para mantener el stock actualizado.</div>
+            <div class="step-tip">⚠️ <span><strong>Importante:</strong> Solo marcar como completado cuando la producción realmente terminó. El sistema descuenta el inventario de forma inmediata e irreversible.</span></div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num sup">E</div>
+          <div class="step-body">
+            <div class="step-title">Editar o eliminar un plan</div>
+            <div class="step-desc">Tocar el plan → ícono de <strong>editar</strong> para cambiar fecha, lotes o estilo. Para eliminar: ícono de <strong>papelera</strong> → confirmar. Los planes completados no pueden eliminarse para mantener el historial.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUP: RECETAS -->
+    <div class="section">
+      <div class="section-label">4 · Recetas y Estilos</div>
+      <div class="steps">
+        <div class="step-card">
+          <div class="step-num sup">A</div>
+          <div class="step-body">
+            <div class="step-title">Ver la biblioteca de recetas</div>
+            <div class="step-desc">Ir a la pestaña <strong>Recetas</strong>. Aparecen todos los estilos de cerveza registrados con su imagen o avatar dorado. Tocar cualquier estilo para ver sus ingredientes con cantidades.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num sup">B</div>
+          <div class="step-body">
+            <div class="step-title">Crear un nuevo estilo de cerveza</div>
+            <div class="step-desc">Tocar <strong>＋ Nuevo estilo</strong> → ingresar el <strong>nombre del estilo</strong> → opcionalmente agregar una <strong>foto</strong> desde la galería del teléfono. Confirmar con <strong>"Crear"</strong>. Después agregar los ingredientes desde el detalle del estilo.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num sup">C</div>
+          <div class="step-body">
+            <div class="step-title">Agregar ingredientes a una receta</div>
+            <div class="step-desc">Dentro del estilo → tocar <strong>"Agregar ingrediente"</strong> → seleccionar el ingrediente del inventario → ingresar la cantidad por lote y la unidad. Repetir para cada ingrediente de la receta.</div>
+            <div class="step-tip">💡 <span>Las cantidades deben corresponder a <strong>un lote</strong>. Si el plan de producción es de 3 lotes, el sistema multiplica automáticamente.</span></div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num sup">D</div>
+          <div class="step-body">
+            <div class="step-title">Renombrar un estilo</div>
+            <div class="step-desc">Tocar el estilo → ícono de <strong>editar</strong> → cambiar el nombre → guardar. El cambio se propaga automáticamente a todos los planes de producción que usen ese estilo.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num sup">E</div>
+          <div class="step-body">
+            <div class="step-title">Eliminar un estilo</div>
+            <div class="step-desc">Tocar el estilo → ícono de <strong>papelera</strong> → confirmar. Solo se pueden eliminar estilos que no tengan planes de producción activos vinculados.</div>
+            <div class="step-tip">⚠️ <span><strong>Precaución:</strong> Eliminar un estilo también elimina su receta completa. Esta acción no puede deshacerse.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUP: ÓRDENES -->
+    <div class="section">
+      <div class="section-label">5 · Órdenes de Compra</div>
+      <div class="steps">
+        <div class="step-card">
+          <div class="step-num sup">A</div>
+          <div class="step-body">
+            <div class="step-title">Ver órdenes activas</div>
+            <div class="step-desc">Ir a la pestaña <strong>Órdenes</strong>. Aparecen agrupadas por estado: <strong>Pendientes</strong> (aún no enviadas al proveedor), <strong>En tránsito</strong> (pedido hecho, esperando llegada) y <strong>Recibidas</strong> (llegaron a la cervecería).</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num sup">B</div>
+          <div class="step-body">
+            <div class="step-title">Actualizar el estado de una orden</div>
+            <div class="step-desc">Tocar la orden → tocar <strong>"Cambiar estado"</strong>. Mover a <strong>"En tránsito"</strong> cuando se haga el pedido al proveedor, ingresando la <strong>fecha estimada de llegada</strong>. Esto activa el contador de días en la app.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num sup">C</div>
+          <div class="step-body">
+            <div class="step-title">Registrar la llegada de un pedido (Recepción)</div>
+            <div class="step-desc">Cuando el pedido llega a la cervecería, tocar la orden <strong>En tránsito</strong> → <strong>"Registrar recepción"</strong> → ingresar la <strong>cantidad recibida</strong> (puede ser parcial si llegó incompleto) → confirmar. El inventario se actualiza automáticamente.</div>
+            <div class="step-tip">💡 <span>Si la recepción es <strong>parcial</strong>, la orden queda en estado "Recibida parcialmente" y puede recibirse el resto cuando llegue.</span></div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num sup">D</div>
+          <div class="step-body">
+            <div class="step-title">Cancelar una orden</div>
+            <div class="step-desc">Tocar la orden → <strong>"Cancelar orden"</strong> → confirmar. Solo se pueden cancelar órdenes que aún no hayan sido recibidas.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="note-box info" style="margin-top:16px;">
+        <strong>Tabla de permisos del Supervisor — Resumen:</strong>
+        <table class="perm-table" style="margin-top:12px;">
+          <thead><tr><th>Acción</th><th>¿Puede hacerlo?</th></tr></thead>
+          <tbody>
+            <tr><td>Ver dashboard y alertas</td><td class="yes">✓ Sí</td></tr>
+            <tr><td>Crear y editar ingredientes</td><td class="yes">✓ Sí</td></tr>
+            <tr><td>Crear y completar planes de producción</td><td class="yes">✓ Sí</td></tr>
+            <tr><td>Crear y gestionar recetas</td><td class="yes">✓ Sí</td></tr>
+            <tr><td>Generar y gestionar órdenes de compra</td><td class="yes">✓ Sí</td></tr>
+            <tr><td>Registrar recepciones de pedidos</td><td class="yes">✓ Sí</td></tr>
+            <tr><td>Crear o eliminar usuarios</td><td class="no">✗ No — solo el Administrador</td></tr>
+            <tr><td>Cambiar roles de otros usuarios</td><td class="no">✗ No — solo el Administrador</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ══════════════════════════════════════════════════════════
+         SECCIÓN OPERADOR
+    ══════════════════════════════════════════════════════════════ -->
+    <div class="print-break"></div>
+    <div class="role-banner op" style="margin: 0 -80px;">
+      <div class="role-banner-eyebrow op">Rol</div>
+      <h2>Operador</h2>
+      <p>Acceso de consulta y registro en campo. Diseñado para personal de bodega y área de producción.</p>
+      <div class="role-scope">
+        <span class="scope-pill op">Ver dashboard</span>
+        <span class="scope-pill op">Consultar inventario</span>
+        <span class="scope-pill op">Ver planes de producción</span>
+        <span class="scope-pill op">Registrar recepciones</span>
+      </div>
+    </div>
+
+    <!-- OP: DASHBOARD -->
+    <div class="section">
+      <div class="section-label">1 · Dashboard</div>
+      <div class="note-box ok" style="margin-bottom:16px;">
+        El Operador puede <strong>ver</strong> el dashboard completo pero no puede modificar ningún dato desde él. Es su punto de referencia para saber qué hay que atender antes de comenzar la jornada.
+      </div>
+      <div class="steps">
+        <div class="step-card">
+          <div class="step-num op">→</div>
+          <div class="step-body">
+            <div class="step-title">Revisar alertas al inicio de turno</div>
+            <div class="step-desc">Al abrir la app, el dashboard muestra las alertas activas. Si hay ingredientes en <strong>CRÍTICO o URGENTE</strong>, notificar de inmediato al Supervisor para que tome acción.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num op">→</div>
+          <div class="step-body">
+            <div class="step-title">Verificar los planes del día</div>
+            <div class="step-desc">La sección de planes próximos muestra qué se va a producir en los próximos días. Consultar para preparar el área de trabajo y verificar que los ingredientes estén disponibles en bodega.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OP: INVENTARIO -->
+    <div class="section">
+      <div class="section-label">2 · Consulta de Inventario</div>
+      <div class="note-box warn" style="margin-bottom:16px;">
+        <strong>El Operador solo puede consultar el inventario.</strong> Para agregar, editar o ajustar cantidades, debe contactar al Supervisor.
+      </div>
+      <div class="steps">
+        <div class="step-card">
+          <div class="step-num op">A</div>
+          <div class="step-body">
+            <div class="step-title">Buscar un ingrediente</div>
+            <div class="step-desc">Ir a la pestaña <strong>Inventario</strong> → usar la <strong>barra de búsqueda</strong> para escribir el nombre del ingrediente. La lista se filtra en tiempo real. También puede usar los filtros por tipo o por estado de alerta.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num op">B</div>
+          <div class="step-body">
+            <div class="step-title">Ver el detalle de un ingrediente</div>
+            <div class="step-desc">Tocar el ingrediente para ver su ficha completa: cantidad actual, unidad, proveedor, precio unitario y estado JÏT. Útil para verificar stock antes de iniciar producción.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num op">C</div>
+          <div class="step-body">
+            <div class="step-title">Reportar discrepancia al Supervisor</div>
+            <div class="step-desc">Si la cantidad que muestra la app no corresponde con lo que hay físicamente en bodega, notificar al <strong>Supervisor</strong> con el nombre del ingrediente y la cantidad real. El Supervisor realizará el ajuste en el sistema.</div>
+            <div class="step-tip">⚠️ <span>No intentar modificar el inventario directamente. Cualquier ajuste sin respaldo puede afectar las alertas JÏT y las órdenes de compra.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OP: RECEPCIONES -->
+    <div class="section">
+      <div class="section-label">3 · Recepción de Pedidos</div>
+      <div class="note-box ok" style="margin-bottom:16px;">
+        Esta es la función más importante del Operador. Al registrar una recepción, el inventario se actualiza automáticamente y las alertas JÏT se recalculan.
+      </div>
+      <div class="steps">
+        <div class="step-card">
+          <div class="step-num op">1</div>
+          <div class="step-body">
+            <div class="step-title">Ir al módulo de Órdenes</div>
+            <div class="step-desc">Tocar la pestaña <strong>Órdenes</strong> en la barra inferior. Ver la lista de órdenes <strong>En tránsito</strong> — estas son las que pueden recibirse.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num op">2</div>
+          <div class="step-body">
+            <div class="step-title">Identificar la orden que llegó</div>
+            <div class="step-desc">Buscar en la lista la orden que corresponde al pedido físico que acaba de llegar. Verificar el <strong>nombre del ingrediente</strong> y el <strong>proveedor</strong> para confirmar que es la orden correcta.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num op">3</div>
+          <div class="step-body">
+            <div class="step-title">Registrar la recepción</div>
+            <div class="step-desc">Tocar la orden → <strong>"Registrar recepción"</strong> → ingresar la <strong>cantidad recibida</strong> exacta según lo que llegó físicamente → confirmar. El inventario se actualiza al instante.</div>
+            <div class="step-tip">💡 <span>Si llegó menos de lo pedido, ingresar solo la cantidad real recibida. La orden quedará como <strong>"Recibida parcialmente"</strong> y podrá completarse cuando llegue el resto.</span></div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num op">4</div>
+          <div class="step-body">
+            <div class="step-title">Verificar que el inventario se actualizó</div>
+            <div class="step-desc">Ir a <strong>Inventario</strong> y buscar el ingrediente recibido. Confirmar que la cantidad aumentó correctamente. Si hay algún error, notificar al Supervisor.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OP: PRODUCCIÓN -->
+    <div class="section">
+      <div class="section-label">4 · Consulta de Producción</div>
+      <div class="note-box warn" style="margin-bottom:16px;">
+        <strong>El Operador puede ver los planes de producción pero no puede crearlos, editarlos ni marcarlos como completados.</strong> Esas acciones son exclusivas del Supervisor y Administrador.
+      </div>
+      <div class="steps">
+        <div class="step-card">
+          <div class="step-num op">→</div>
+          <div class="step-body">
+            <div class="step-title">Consultar el plan del día</div>
+            <div class="step-desc">Ir a la pestaña <strong>Producción</strong>. Ver los planes activos con su fecha, estilo y estado. Tocar cualquier plan para ver qué ingredientes necesita y en qué cantidades.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num op">→</div>
+          <div class="step-body">
+            <div class="step-title">Verificar ingredientes antes de producir</div>
+            <div class="step-desc">Dentro del plan → revisar el estado JÏT de cada ingrediente. Si alguno aparece en <strong>CRÍTICO o URGENTE</strong>, notificar al Supervisor antes de comenzar la producción.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="note-box info" style="margin-top:16px;">
+        <strong>Tabla de permisos del Operador — Resumen:</strong>
+        <table class="perm-table" style="margin-top:12px;">
+          <thead><tr><th>Acción</th><th>¿Puede hacerlo?</th></tr></thead>
+          <tbody>
+            <tr><td>Ver dashboard y alertas</td><td class="yes">✓ Sí</td></tr>
+            <tr><td>Consultar inventario</td><td class="yes">✓ Sí (solo lectura)</td></tr>
+            <tr><td>Registrar recepciones de pedidos</td><td class="yes">✓ Sí</td></tr>
+            <tr><td>Ver planes de producción</td><td class="yes">✓ Sí (solo lectura)</td></tr>
+            <tr><td>Ver órdenes de compra</td><td class="yes">✓ Sí (solo lectura)</td></tr>
+            <tr><td>Crear o editar ingredientes</td><td class="no">✗ No</td></tr>
+            <tr><td>Crear o completar planes de producción</td><td class="no">✗ No</td></tr>
+            <tr><td>Crear o modificar recetas</td><td class="no">✗ No</td></tr>
+            <tr><td>Generar órdenes de compra</td><td class="no">✗ No</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ══ TRANSPORTISTA - COMING SOON ════════════════════════════ -->
+    <div class="coming-soon">
+      <div class="coming-soon-badge">En Desarrollo · Próximamente</div>
+      <h3>Rol: Transportista</h3>
+      <p>
+        Se encuentra en desarrollo un tercer perfil de usuario diseñado para el personal encargado de la logística y entrega de materia prima. El rol de <strong style="color:#d8b4fe;">Transportista</strong> permitirá a proveedores o transportistas externos interactuar directamente con el sistema sin acceso a información operativa interna de la cervecería.
+      </p>
+      <div>
+        <div class="trans-feature">📍 Actualizar ubicación de un pedido en tránsito</div>
+        <div class="trans-feature">✅ Confirmar entrega al llegar a la cervecería</div>
+        <div class="trans-feature">📷 Adjuntar foto de comprobante de entrega</div>
+        <div class="trans-feature">📅 Reportar retrasos con nueva fecha estimada</div>
+        <div class="trans-feature">🔒 Sin acceso a inventario, recetas ni producción</div>
+      </div>
+      <div style="margin-top:24px; font-size:12px; color:#555; border-top:1px dashed rgba(168,85,247,.2); padding-top:16px;">
+        Este rol reducirá la carga de seguimiento manual de pedidos por parte del Supervisor y permitirá al sistema actualizar automáticamente el estado de las órdenes en tránsito.
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="doc-footer">
+      <span>Rrëy: JÏT — Instructivo de Usuarios · Versión 1.0 · 2026</span>
+      <span>Documento interno — Cervecería Rrëy</span>
+    </div>
+
+  </div><!-- /body -->
+</div><!-- /page -->
+</body>
+</html>

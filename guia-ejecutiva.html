@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rrëy: JÏT — Guía Ejecutiva</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700;900&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0C0C0C;
+    --bg2: #141414;
+    --bg3: #1a1a1a;
+    --gold: #c9963a;
+    --gold2: #e8b455;
+    --gold3: #f5d080;
+    --white: #f0efe9;
+    --muted: #888;
+    --border: rgba(201,150,58,0.2);
+    --border2: #222;
+    --green: #22c55e;
+    --red: #ef4444;
+    --orange: #f97316;
+    --yellow: #eab308;
+    --blue: #3b82f6;
+  }
+
+  body { background: var(--bg); color: var(--white); font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.7; }
+
+  @media print {
+    body { background: #fff; color: #111; }
+    .no-print { display: none !important; }
+    .print-break { page-break-before: always; }
+    .section-card { background: #fafafa !important; border-color: #e5e5e5 !important; }
+    .cover { background: #0C0C0C !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .module-card { background: #fafafa !important; border-color: #e5e5e5 !important; }
+    .alert-row { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .role-card { background: #fafafa !important; border-color: #e5e5e5 !important; }
+  }
+
+  /* ── PRINT BAR ───────────────────────────────────────────── */
+  .print-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(14,14,14,.95); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 40px; display: flex; justify-content: space-between; align-items: center;
+  }
+  .print-bar-title { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .print-bar-title span { color: var(--white); }
+  .btn-print {
+    background: linear-gradient(135deg, var(--gold), #a06b1a);
+    color: #0C0C0C; font-weight: 700; font-size: 13px;
+    padding: 7px 18px; border-radius: 20px; border: none; cursor: pointer; font-family: 'Inter', sans-serif;
+  }
+  body { padding-top: 52px; }
+  @media print { body { padding-top: 0; } }
+
+  /* ── PAGE ────────────────────────────────────────────────── */
+  .page { max-width: 900px; margin: 0 auto; }
+
+  /* ── COVER ───────────────────────────────────────────────── */
+  .cover {
+    background: var(--bg); padding: 80px 80px 64px;
+    position: relative; overflow: hidden; border-bottom: 1px solid var(--border);
+  }
+  .cover-grid {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image: linear-gradient(rgba(201,150,58,.025) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(201,150,58,.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+  .cover-glow {
+    position: absolute; top: -40%; right: -15%; width: 600px; height: 600px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(201,150,58,.06) 0%, transparent 65%); pointer-events: none;
+  }
+  .cover-content { position: relative; z-index: 1; }
+  .doc-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: var(--gold); margin-bottom: 18px; display: flex; align-items: center; gap: 10px; }
+  .doc-eyebrow::before { content: ''; display: block; width: 24px; height: 1px; background: var(--gold); }
+  .cover-logo { font-family: 'Playfair Display', serif; font-size: 64px; font-weight: 900; letter-spacing: -2px; line-height: 1; }
+  .cover-logo span { background: linear-gradient(135deg, var(--gold3), var(--gold)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .cover-tagline { font-size: 18px; color: var(--muted); margin: 10px 0 36px; font-weight: 400; }
+  .cover-desc { font-size: 15px; color: #aaa; line-height: 1.8; max-width: 580px; margin-bottom: 48px; }
+  .cover-meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+  .meta-item { border-top: 1px solid var(--border); padding-top: 12px; }
+  .meta-label { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .meta-value { font-size: 13px; font-weight: 600; color: var(--white); }
+
+  /* ── BODY ────────────────────────────────────────────────── */
+  .body { padding: 64px 80px; }
+
+  /* ── CHAPTER ─────────────────────────────────────────────── */
+  .chapter { margin-bottom: 56px; }
+  .chapter-header { display: flex; align-items: flex-start; gap: 18px; margin-bottom: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+  .chapter-num { font-family: 'Playfair Display', serif; font-size: 48px; font-weight: 900; color: var(--gold); opacity: .35; line-height: 1; flex-shrink: 0; }
+  .chapter-info { flex: 1; }
+  .chapter-info h2 { font-size: 24px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+  .chapter-info p { font-size: 13px; color: var(--muted); }
+  .body-text { font-size: 14px; color: #a8a6a0; line-height: 1.85; margin-bottom: 16px; }
+  .body-text strong { color: var(--white); }
+  .body-text .hl { color: var(--gold2); font-weight: 600; }
+  .divider { height: 1px; background: var(--border2); margin: 36px 0; }
+
+  /* ── CARDS ───────────────────────────────────────────────── */
+  .section-card { background: var(--bg2); border: 1px solid var(--border2); border-radius: 14px; padding: 22px; margin-bottom: 12px; }
+  .card-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  .card-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px; }
+
+  /* ── MODULE CARDS ────────────────────────────────────────── */
+  .module-card {
+    background: var(--bg2); border: 1px solid var(--border2); border-radius: 16px;
+    overflow: hidden; margin-bottom: 20px;
+  }
+  .module-header {
+    display: flex; align-items: center; gap: 16px;
+    padding: 20px 24px; border-bottom: 1px solid var(--border2);
+    background: var(--bg3);
+  }
+  .module-icon { font-size: 28px; flex-shrink: 0; }
+  .module-title { font-size: 17px; font-weight: 700; color: var(--white); margin-bottom: 2px; }
+  .module-subtitle { font-size: 12px; color: var(--muted); }
+  .module-body { padding: 20px 24px; }
+  .module-body p { font-size: 13.5px; color: #a0a0a0; line-height: 1.8; margin-bottom: 14px; }
+  .module-body p:last-child { margin-bottom: 0; }
+  .module-body strong { color: var(--white); }
+
+  /* ── ALERT DEMO ──────────────────────────────────────────── */
+  .alert-demo { border-radius: 12px; overflow: hidden; border: 1px solid var(--border2); margin: 14px 0; }
+  .alert-demo-header { padding: 10px 16px; background: var(--bg3); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .alert-row { display: flex; align-items: center; padding: 13px 16px; gap: 14px; border-bottom: 1px solid rgba(255,255,255,.04); }
+  .alert-row:last-child { border-bottom: none; }
+  .alert-row.c { background: rgba(239,68,68,.08); }
+  .alert-row.u { background: rgba(249,115,22,.07); }
+  .alert-row.y { background: rgba(234,179,8,.06); }
+  .alert-row.g { background: rgba(34,197,94,.05); }
+  .alert-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .alert-dot.c { background: var(--red); }
+  .alert-dot.u { background: var(--orange); }
+  .alert-dot.y { background: var(--yellow); }
+  .alert-dot.g { background: var(--green); }
+  .alert-info { flex: 1; }
+  .alert-name { font-size: 14px; font-weight: 600; color: var(--white); }
+  .alert-desc { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .alert-action { font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; flex-shrink: 0; }
+  .alert-action.c { background: rgba(239,68,68,.2); color: #f87171; }
+  .alert-action.u { background: rgba(249,115,22,.2); color: #fb923c; }
+  .alert-action.y { background: rgba(234,179,8,.2); color: #facc15; }
+  .alert-action.g { background: rgba(34,197,94,.15); color: #4ade80; }
+
+  /* ── ROLE CARDS ──────────────────────────────────────────── */
+  .role-card { background: var(--bg2); border: 1px solid var(--border2); border-radius: 14px; padding: 20px; }
+  .role-title { font-size: 15px; font-weight: 700; color: var(--white); margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .role-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+  .role-badge.admin { background: rgba(201,150,58,.15); color: var(--gold2); }
+  .role-badge.sup { background: rgba(59,130,246,.15); color: #93c5fd; }
+  .role-badge.op { background: rgba(34,197,94,.12); color: #86efac; }
+  .role-desc { font-size: 13px; color: var(--muted); margin-bottom: 14px; line-height: 1.6; }
+  .role-perm { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #a0a0a0; padding: 5px 0; border-bottom: 1px solid #1a1a1a; }
+  .role-perm:last-child { border-bottom: none; }
+  .role-perm .icon { font-size: 14px; flex-shrink: 0; }
+
+  /* ── KPI DEMO ────────────────────────────────────────────── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 14px 0; }
+  .kpi { background: var(--bg3); border: 1px solid var(--border2); border-radius: 12px; padding: 16px; text-align: center; }
+  .kpi .num { font-size: 26px; font-weight: 800; color: var(--gold2); line-height: 1; margin-bottom: 6px; }
+  .kpi .lbl { font-size: 11px; color: var(--muted); line-height: 1.3; }
+
+  /* ── FLOW ────────────────────────────────────────────────── */
+  .flow { display: flex; align-items: center; gap: 0; flex-wrap: wrap; margin: 16px 0; }
+  .flow-step { background: var(--bg2); border: 1px solid var(--border2); border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 600; color: var(--white); white-space: nowrap; }
+  .flow-arrow { color: var(--gold); font-size: 18px; padding: 0 8px; flex-shrink: 0; }
+
+  /* ── TAG ─────────────────────────────────────────────────── */
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 4px 12px; border-radius: 20px; background: rgba(201,150,58,.1); color: var(--gold2); border: 1px solid var(--border); margin-bottom: 6px; }
+
+  /* ── CALLOUT ─────────────────────────────────────────────── */
+  .callout { background: rgba(201,150,58,.07); border-left: 3px solid var(--gold); border-radius: 0 10px 10px 0; padding: 14px 18px; margin: 16px 0; font-size: 13.5px; color: #b0b0a8; line-height: 1.7; }
+  .callout strong { color: var(--white); }
+
+  /* ── CHECKLIST ───────────────────────────────────────────── */
+  .check-item { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1a1a1a; font-size: 13px; color: #a0a0a0; }
+  .check-item:last-child { border-bottom: none; }
+  .check-item .ck { color: var(--green); flex-shrink: 0; font-size: 14px; }
+  .check-item .cx { color: var(--red); flex-shrink: 0; font-size: 14px; }
+
+  /* ── GLOSSARY ────────────────────────────────────────────── */
+  .term { display: grid; grid-template-columns: 160px 1fr; gap: 16px; padding: 12px 0; border-bottom: 1px solid #1a1a1a; }
+  .term:last-child { border-bottom: none; }
+  .term-word { font-size: 13px; font-weight: 700; color: var(--gold2); }
+  .term-def { font-size: 13px; color: #a0a0a0; line-height: 1.6; }
+
+  /* ── FOOTER ──────────────────────────────────────────────── */
+  .doc-footer { margin-top: 48px; padding: 20px 0; border-top: 1px solid var(--border2); display: flex; justify-content: space-between; align-items: center; }
+  .doc-footer span { font-size: 11px; color: #333; }
+</style>
+</head>
+<body>
+
+<div class="print-bar no-print">
+  <div class="print-bar-title">Guía Ejecutiva — <span>Rrëy: JÏT</span></div>
+  <button class="btn-print" onclick="window.print()">Imprimir / Exportar PDF</button>
+</div>
+
+<div class="page">
+
+  <!-- ══ COVER ══════════════════════════════════════════════════ -->
+  <div class="cover">
+    <div class="cover-grid"></div>
+    <div class="cover-glow"></div>
+    <div class="cover-content">
+      <div class="doc-eyebrow">Guía Ejecutiva · Cervecería Rrëy</div>
+      <div class="cover-logo">Rrëy: <span>JÏT</span></div>
+      <div class="cover-tagline">Sistema de Gestión de Inventario y Producción</div>
+      <div class="cover-desc">
+        Este documento explica en lenguaje claro y sin tecnicismos cómo funciona la aplicación Rrëy: JÏT, qué problema resuelve en la operación diaria de la cervecería, cómo usarla, y qué decisiones facilita para la dirección.
+      </div>
+      <div class="cover-meta">
+        <div class="meta-item"><div class="meta-label">Plataformas</div><div class="meta-value">iOS · Android · Web</div></div>
+        <div class="meta-item"><div class="meta-label">Módulos</div><div class="meta-value">5 integrados</div></div>
+        <div class="meta-item"><div class="meta-label">Acceso</div><div class="meta-value">Por roles</div></div>
+        <div class="meta-item"><div class="meta-label">Versión</div><div class="meta-value">1.0 · 2026</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- ══ CAP 1: QUÉ ES ══════════════════════════════════════════ -->
+    <div class="chapter">
+      <div class="chapter-header">
+        <div class="chapter-num">1</div>
+        <div class="chapter-info">
+          <h2>¿Qué es Rrëy: JÏT?</h2>
+          <p>El problema que resuelve y por qué importa</p>
+        </div>
+      </div>
+
+      <p class="body-text">
+        <strong>Rrëy: JÏT</strong> es una aplicación desarrollada exclusivamente para Cervecería Rrëy que conecta tres partes críticas de la operación que antes estaban desconectadas: el <strong>inventario de ingredientes</strong>, los <strong>planes de producción</strong> y los <strong>proveedores</strong>.
+      </p>
+      <p class="body-text">
+        El nombre <span class="hl">JÏT</span> viene de <em>Just-In-Time</em>, una filosofía de gestión que busca tener los insumos disponibles <strong>exactamente cuando se necesitan</strong> — ni antes (capital inmovilizado en bodega) ni después (producción detenida).
+      </p>
+
+      <div class="callout">
+        <strong>En términos simples:</strong> la app sabe qué cerveza se va a producir, cuándo, qué ingredientes necesita, cuánto tiempo tarda en llegar cada uno desde el proveedor — y te avisa con anticipación exacta cuándo hay que hacer el pedido.
+      </div>
+
+      <div class="card-grid-2">
+        <div class="section-card">
+          <div style="font-size:24px; margin-bottom:10px;">❌</div>
+          <div style="font-size:14px; font-weight:700; color:var(--white); margin-bottom:8px;">Antes: sin la app</div>
+          <div class="check-item"><span class="cx">✗</span> Inventario en hojas de cálculo o de memoria</div>
+          <div class="check-item"><span class="cx">✗</span> Pedidos reactivos — se ordena cuando ya falta</div>
+          <div class="check-item"><span class="cx">✗</span> Paros de producción por falta de ingredientes</div>
+          <div class="check-item"><span class="cx">✗</span> Sin visibilidad del stock en tiempo real</div>
+          <div class="check-item"><span class="cx">✗</span> Decisiones basadas en intuición, no en datos</div>
+        </div>
+        <div class="section-card">
+          <div style="font-size:24px; margin-bottom:10px;">✅</div>
+          <div style="font-size:14px; font-weight:700; color:var(--white); margin-bottom:8px;">Con Rrëy: JÏT</div>
+          <div class="check-item"><span class="ck">✓</span> Inventario actualizado en tiempo real, en el teléfono</div>
+          <div class="check-item"><span class="ck">✓</span> Alertas automáticas días antes de que falte algo</div>
+          <div class="check-item"><span class="ck">✓</span> Cero paros de producción por falta de insumos</div>
+          <div class="check-item"><span class="ck">✓</span> Visibilidad completa desde cualquier lugar</div>
+          <div class="check-item"><span class="ck">✓</span> Decisiones basadas en datos reales</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ══ CAP 2: CÓMO FUNCIONA ════════════════════════════════════ -->
+    <div class="chapter">
+      <div class="chapter-header">
+        <div class="chapter-num">2</div>
+        <div class="chapter-info">
+          <h2>¿Cómo funciona el sistema?</h2>
+          <p>La lógica detrás de las alertas y decisiones</p>
+        </div>
+      </div>
+
+      <p class="body-text">
+        El sistema funciona cruzando tres datos clave para cada ingrediente: <strong>cuándo se necesita</strong> (fecha del plan de producción), <strong>cuánto tarda en llegar</strong> (tiempo de entrega del proveedor) y <strong>cuánto hay en bodega</strong>. Con esa información, calcula automáticamente el estado de cada ingrediente y genera una alerta de color.
+      </p>
+
+      <div class="flow">
+        <div class="flow-step">📅 Fecha de producción</div>
+        <div class="flow-arrow">+</div>
+        <div class="flow-step">🚚 Lead time del proveedor</div>
+        <div class="flow-arrow">+</div>
+        <div class="flow-step">📦 Stock actual</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step" style="border-color:var(--border); color:var(--gold2);">🔔 Alerta JÏT</div>
+      </div>
+
+      <p class="body-text" style="margin-top:16px;">
+        El resultado es un semáforo de cuatro colores que aparece en todo momento junto a cada ingrediente:
+      </p>
+
+      <div class="alert-demo">
+        <div class="alert-demo-header">Estado JÏT — Ejemplo de ingredientes</div>
+        <div class="alert-row c">
+          <div class="alert-dot c"></div>
+          <div class="alert-info">
+            <div class="alert-name">Lúpulo Cascade</div>
+            <div class="alert-desc">El pedido llegaría después de la fecha de producción — ya no hay tiempo suficiente</div>
+          </div>
+          <div class="alert-action c">CRÍTICO</div>
+        </div>
+        <div class="alert-row u">
+          <div class="alert-dot u"></div>
+          <div class="alert-info">
+            <div class="alert-name">Levadura WY1056</div>
+            <div class="alert-desc">Debe ordenarse hoy — quedan menos días de los que tarda el proveedor en entregar</div>
+          </div>
+          <div class="alert-action u">URGENTE</div>
+        </div>
+        <div class="alert-row y">
+          <div class="alert-dot y"></div>
+          <div class="alert-info">
+            <div class="alert-name">Malta Pilsner</div>
+            <div class="alert-desc">Hay margen — más de 7 días de anticipación disponibles para hacer el pedido</div>
+          </div>
+          <div class="alert-action y">CON MARGEN</div>
+        </div>
+        <div class="alert-row g">
+          <div class="alert-dot g"></div>
+          <div class="alert-info">
+            <div class="alert-name">Agua tratada</div>
+            <div class="alert-desc">Stock suficiente para cubrir todos los planes de producción próximos</div>
+          </div>
+          <div class="alert-action g">OK</div>
+        </div>
+      </div>
+
+      <div class="callout">
+        <strong>Regla de oro:</strong> Si en el dashboard aparece algún ingrediente en <strong style="color:#f87171;">CRÍTICO</strong> o <strong style="color:#fb923c;">URGENTE</strong>, requiere atención inmediata. <strong style="color:#facc15;">CON MARGEN</strong> significa que hay tiempo pero hay que planificar el pedido. <strong style="color:#4ade80;">OK</strong> no requiere ninguna acción.
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ══ CAP 3: LOS 5 MÓDULOS ════════════════════════════════════ -->
+    <div class="chapter">
+      <div class="chapter-header">
+        <div class="chapter-num">3</div>
+        <div class="chapter-info">
+          <h2>Los 5 módulos de la aplicación</h2>
+          <p>Qué hace cada sección y para quién es útil</p>
+        </div>
+      </div>
+
+      <!-- DASHBOARD -->
+      <div class="module-card">
+        <div class="module-header">
+          <div class="module-icon">📊</div>
+          <div>
+            <div class="module-title">Dashboard — Vista general</div>
+            <div class="module-subtitle">La primera pantalla al abrir la app · Para dirección y supervisión</div>
+          </div>
+        </div>
+        <div class="module-body">
+          <p>El dashboard es el <strong>resumen ejecutivo en tiempo real</strong> de la operación. De un vistazo muestra los indicadores más importantes sin necesidad de entrar a ningún otro módulo.</p>
+          <div class="kpi-grid">
+            <div class="kpi"><div class="num">$180K</div><div class="lbl">Valor del inventario en MXN</div></div>
+            <div class="kpi"><div class="num">3</div><div class="lbl">Alertas urgentes activas</div></div>
+            <div class="kpi"><div class="num">2</div><div class="lbl">Planes de producción esta semana</div></div>
+            <div class="kpi"><div class="num">5</div><div class="lbl">Órdenes de compra en tránsito</div></div>
+          </div>
+          <p>Además muestra una <strong>franja de alertas</strong> con los ingredientes más críticos y la lista de producciones próximas en los siguientes 7 días. Es la pantalla que la dirección debe revisar cada mañana.</p>
+        </div>
+      </div>
+
+      <!-- INVENTARIO -->
+      <div class="module-card">
+        <div class="module-header">
+          <div class="module-icon">📦</div>
+          <div>
+            <div class="module-title">Inventario — Control de ingredientes</div>
+            <div class="module-subtitle">Gestión de stock en tiempo real · Para operaciones y supervisión</div>
+          </div>
+        </div>
+        <div class="module-body">
+          <p>Aquí vive el <strong>inventario completo de todos los ingredientes</strong>: lúpulos, maltas, levaduras, adjuntos y más. Cada ingrediente muestra su cantidad actual, unidad de medida, proveedor asignado y su alerta JÏT de color.</p>
+          <p>El inventario tiene <strong>búsqueda instantánea y filtros por tipo o estado de alerta</strong>, por lo que encontrar cualquier ingrediente toma segundos. Cuando llega un pedido del proveedor, se registra aquí y el stock se actualiza automáticamente. Cuando un plan de producción se completa, el sistema descuenta los ingredientes utilizados sin intervención manual.</p>
+          <div class="callout" style="margin-bottom:0;">
+            <strong>Importante para dirección:</strong> El valor total del inventario que aparece en el dashboard se calcula automáticamente desde este módulo. Refleja el capital invertido en materias primas en todo momento.
+          </div>
+        </div>
+      </div>
+
+      <!-- PRODUCCIÓN -->
+      <div class="module-card">
+        <div class="module-header">
+          <div class="module-icon">🏭</div>
+          <div>
+            <div class="module-title">Producción — Planificación de lotes</div>
+            <div class="module-subtitle">Programación y seguimiento de producción · Para brewmaster y supervisión</div>
+          </div>
+        </div>
+        <div class="module-body">
+          <p>En este módulo se crean y gestionan los <strong>planes de producción</strong>. Un plan define qué estilo de cerveza se va a producir, cuándo, en cuántos lotes y cuántos litros. El sistema calcula automáticamente qué ingredientes se necesitan con base en la receta del estilo.</p>
+          <p>Cada plan tiene un estado que avanza conforme se desarrolla: <strong>Pendiente → En Proceso → Completado</strong>. Cuando un plan se marca como completado, el stock de todos los ingredientes utilizados se descuenta automáticamente del inventario.</p>
+          <p>La función más poderosa de este módulo es <strong>Generar Órdenes</strong>: con un solo toque, el sistema analiza los ingredientes necesarios para un plan, revisa el stock disponible y genera la lista exacta de lo que hay que comprar — a qué proveedor y en qué cantidad — sin cálculos manuales.</p>
+        </div>
+      </div>
+
+      <!-- RECETAS -->
+      <div class="module-card">
+        <div class="module-header">
+          <div class="module-icon">📖</div>
+          <div>
+            <div class="module-title">Recetas — Biblioteca de estilos</div>
+            <div class="module-subtitle">Fórmulas de cada cerveza · Para brewmaster y dirección</div>
+          </div>
+        </div>
+        <div class="module-body">
+          <p>Este módulo es la <strong>biblioteca de recetas de Rrëy</strong>. Cada estilo de cerveza — IPA, Stout, Lager, Witbier, etc. — tiene su propia ficha con imagen, nombre y lista de ingredientes con las cantidades exactas por lote.</p>
+          <p>Las recetas son la base del sistema JÏT: cuando se crea un plan de producción para un estilo, el sistema consulta automáticamente su receta para calcular cuánto se necesita de cada ingrediente. Si una receta cambia, el impacto se refleja inmediatamente en todos los planes futuros.</p>
+          <div class="callout" style="margin-bottom:0;">
+            <strong>Para la dirección:</strong> Este módulo representa el catálogo oficial de productos de la cervecería. Tener cada receta documentada con sus ingredientes exactos es también un activo de conocimiento institucional que protege la operación.
+          </div>
+        </div>
+      </div>
+
+      <!-- ÓRDENES -->
+      <div class="module-card">
+        <div class="module-header">
+          <div class="module-icon">🛒</div>
+          <div>
+            <div class="module-title">Órdenes de Compra — Trazabilidad de pedidos</div>
+            <div class="module-subtitle">Seguimiento de compras a proveedores · Para compras y supervisión</div>
+          </div>
+        </div>
+        <div class="module-body">
+          <p>Cada pedido que se hace a un proveedor queda registrado aquí con su <strong>fecha de pedido, cantidad, proveedor, costo y fecha estimada de llegada</strong>. El sistema muestra cuántos días faltan para que llegue cada pedido y si va a llegar a tiempo para la producción planificada.</p>
+          <p>Cuando el pedido llega a la cervecería, se registra la recepción y el inventario se actualiza automáticamente. El módulo también guarda el historial completo de compras, lo que permite analizar patrones con proveedores y costos a lo largo del tiempo.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ══ CAP 4: ROLES ════════════════════════════════════════════ -->
+    <div class="chapter">
+      <div class="chapter-header">
+        <div class="chapter-num">4</div>
+        <div class="chapter-info">
+          <h2>Roles y permisos de usuario</h2>
+          <p>Quién puede ver y hacer qué dentro de la app</p>
+        </div>
+      </div>
+
+      <p class="body-text">
+        La aplicación tiene un sistema de roles que define exactamente qué puede ver y modificar cada persona. Esto garantiza que nadie pueda alterar información crítica por error, y que cada usuario vea solo lo relevante para su función.
+      </p>
+
+      <div class="card-grid-3">
+        <div class="role-card">
+          <div class="role-title">Administrador <span class="role-badge admin">Admin</span></div>
+          <div class="role-desc">Acceso total a la aplicación. Generalmente el dueño o director de la cervecería.</div>
+          <div class="role-perm"><span class="icon">✅</span> Ver todo el sistema</div>
+          <div class="role-perm"><span class="icon">✅</span> Crear y editar recetas</div>
+          <div class="role-perm"><span class="icon">✅</span> Gestionar ingredientes y proveedores</div>
+          <div class="role-perm"><span class="icon">✅</span> Crear y completar planes de producción</div>
+          <div class="role-perm"><span class="icon">✅</span> Gestionar órdenes de compra</div>
+          <div class="role-perm"><span class="icon">✅</span> Administrar usuarios y roles</div>
+        </div>
+        <div class="role-card">
+          <div class="role-title">Supervisor <span class="role-badge sup">Supervisor</span></div>
+          <div class="role-desc">Acceso operativo completo. Para el brewmaster o jefe de producción.</div>
+          <div class="role-perm"><span class="icon">✅</span> Ver todo el sistema</div>
+          <div class="role-perm"><span class="icon">✅</span> Crear y editar recetas</div>
+          <div class="role-perm"><span class="icon">✅</span> Gestionar inventario</div>
+          <div class="role-perm"><span class="icon">✅</span> Crear y completar planes de producción</div>
+          <div class="role-perm"><span class="icon">✅</span> Gestionar órdenes de compra</div>
+          <div class="role-perm"><span class="icon">❌</span> No puede administrar usuarios</div>
+        </div>
+        <div class="role-card">
+          <div class="role-title">Operador <span class="role-badge op">Operador</span></div>
+          <div class="role-desc">Acceso de consulta y registro. Para personal de bodega o producción.</div>
+          <div class="role-perm"><span class="icon">✅</span> Ver inventario y alertas</div>
+          <div class="role-perm"><span class="icon">✅</span> Ver planes de producción</div>
+          <div class="role-perm"><span class="icon">✅</span> Registrar recepciones de pedidos</div>
+          <div class="role-perm"><span class="icon">❌</span> No puede modificar recetas</div>
+          <div class="role-perm"><span class="icon">❌</span> No puede crear planes ni órdenes</div>
+          <div class="role-perm"><span class="icon">❌</span> No puede administrar usuarios</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ══ CAP 5: PLATAFORMAS ══════════════════════════════════════ -->
+    <div class="chapter">
+      <div class="chapter-header">
+        <div class="chapter-num">5</div>
+        <div class="chapter-info">
+          <h2>Plataformas y actualizaciones</h2>
+          <p>Cómo acceder a la app y cómo se mantiene actualizada</p>
+        </div>
+      </div>
+
+      <p class="body-text">
+        La aplicación está disponible simultáneamente en <strong>tres plataformas</strong> con el mismo contenido y funcionalidades, sin necesidad de elegir una sola.
+      </p>
+
+      <div class="card-grid-3" style="margin-bottom:20px;">
+        <div class="section-card" style="text-align:center;">
+          <div style="font-size:32px; margin-bottom:10px;">📱</div>
+          <div style="font-size:15px; font-weight:700; color:var(--white); margin-bottom:6px;">iPhone (iOS)</div>
+          <div style="font-size:13px; color:var(--muted); line-height:1.5;">App instalada en el teléfono. Acceso con Touch ID o Face ID.</div>
+        </div>
+        <div class="section-card" style="text-align:center;">
+          <div style="font-size:32px; margin-bottom:10px;">🤖</div>
+          <div style="font-size:15px; font-weight:700; color:var(--white); margin-bottom:6px;">Android</div>
+          <div style="font-size:13px; color:var(--muted); line-height:1.5;">App instalada en el teléfono. Disponible como archivo APK directo.</div>
+        </div>
+        <div class="section-card" style="text-align:center;">
+          <div style="font-size:32px; margin-bottom:10px;">🌐</div>
+          <div style="font-size:15px; font-weight:700; color:var(--white); margin-bottom:6px;">Navegador Web</div>
+          <div style="font-size:13px; color:var(--muted); line-height:1.5;">Acceso desde cualquier computadora sin instalar nada.</div>
+        </div>
+      </div>
+
+      <div class="callout">
+        <strong>Actualizaciones automáticas:</strong> Cualquier mejora o corrección se envía automáticamente a todos los dispositivos al abrir la app — sin necesidad de actualizar manualmente desde la tienda de apps, sin interrupciones y sin que los usuarios tengan que hacer nada.
+      </div>
+
+      <div class="section-card">
+        <div style="font-size:14px; font-weight:700; color:var(--white); margin-bottom:12px;">🌙 Modo oscuro y modo claro</div>
+        <p style="font-size:13px; color:var(--muted); line-height:1.6; margin:0;">
+          La app adapta automáticamente sus colores al entorno de uso. El <strong style="color:var(--white);">modo oscuro</strong> está optimizado para el área de producción con iluminación reducida. El <strong style="color:var(--white);">modo claro</strong> es ideal para oficina o exteriores. El usuario puede cambiar entre ambos desde la configuración en cualquier momento.
+        </p>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ══ CAP 6: RUTINA DIARIA ════════════════════════════════════ -->
+    <div class="chapter">
+      <div class="chapter-header">
+        <div class="chapter-num">6</div>
+        <div class="chapter-info">
+          <h2>Rutina diaria recomendada</h2>
+          <p>Cómo integrar la app en la operación de Rrëy</p>
+        </div>
+      </div>
+
+      <p class="body-text">
+        Para aprovechar al máximo el sistema JÏT, se recomienda la siguiente rutina por rol:
+      </p>
+
+      <div class="card-grid-2">
+        <div class="section-card">
+          <div style="font-size:13px; font-weight:700; color:var(--gold2); margin-bottom:14px; text-transform:uppercase; letter-spacing:.06em;">Dirección — Cada mañana</div>
+          <div class="check-item"><span class="ck">1</span> Revisar el Dashboard: alertas activas y KPIs</div>
+          <div class="check-item"><span class="ck">2</span> Verificar si hay ingredientes en CRÍTICO o URGENTE</div>
+          <div class="check-item"><span class="ck">3</span> Confirmar planes de producción de la semana</div>
+          <div class="check-item"><span class="ck">4</span> Revisar órdenes en tránsito y sus fechas de llegada</div>
+        </div>
+        <div class="section-card">
+          <div style="font-size:13px; font-weight:700; color:var(--gold2); margin-bottom:14px; text-transform:uppercase; letter-spacing:.06em;">Brewmaster — Al planificar producción</div>
+          <div class="check-item"><span class="ck">1</span> Crear el plan de producción con estilo y fecha</div>
+          <div class="check-item"><span class="ck">2</span> Revisar el estado JÏT de cada ingrediente requerido</div>
+          <div class="check-item"><span class="ck">3</span> Generar órdenes de compra para lo que falta</div>
+          <div class="check-item"><span class="ck">4</span> Marcar el plan como completado al terminar el lote</div>
+        </div>
+        <div class="section-card">
+          <div style="font-size:13px; font-weight:700; color:var(--gold2); margin-bottom:14px; text-transform:uppercase; letter-spacing:.06em;">Compras — Al recibir pedidos</div>
+          <div class="check-item"><span class="ck">1</span> Abrir el módulo de Órdenes</div>
+          <div class="check-item"><span class="ck">2</span> Registrar la recepción del pedido con cantidad recibida</div>
+          <div class="check-item"><span class="ck">3</span> El inventario se actualiza automáticamente</div>
+          <div class="check-item"><span class="ck">4</span> Verificar que las alertas JÏT se resuelven</div>
+        </div>
+        <div class="section-card">
+          <div style="font-size:13px; font-weight:700; color:var(--gold2); margin-bottom:14px; text-transform:uppercase; letter-spacing:.06em;">Operaciones — En bodega</div>
+          <div class="check-item"><span class="ck">1</span> Consultar inventario para verificar existencias</div>
+          <div class="check-item"><span class="ck">2</span> Reportar cualquier discrepancia al supervisor</div>
+          <div class="check-item"><span class="ck">3</span> Verificar alertas antes de iniciar producción</div>
+          <div class="check-item"><span class="ck">4</span> Confirmar recepciones de materia prima</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ══ CAP 7: GLOSARIO ════════════════════════════════════════ -->
+    <div class="chapter">
+      <div class="chapter-header">
+        <div class="chapter-num">7</div>
+        <div class="chapter-info">
+          <h2>Glosario de términos</h2>
+          <p>Definiciones rápidas de los conceptos usados en la app</p>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="term"><div class="term-word">JÏT (Just-In-Time)</div><div class="term-def">Filosofía de gestión que busca tener los insumos disponibles exactamente cuando se necesitan, evitando excesos y faltantes.</div></div>
+        <div class="term"><div class="term-word">Lead Time</div><div class="term-def">Tiempo que tarda un proveedor en entregar un pedido desde que se hace la orden, medido en días.</div></div>
+        <div class="term"><div class="term-word">Alerta CRÍTICO</div><div class="term-def">El ingrediente no llegará a tiempo aunque se ordene hoy. Requiere acción inmediata — contactar al proveedor o buscar alternativa.</div></div>
+        <div class="term"><div class="term-word">Alerta URGENTE</div><div class="term-def">Hay que hacer el pedido hoy mismo para que llegue a tiempo a la producción planificada.</div></div>
+        <div class="term"><div class="term-word">Alerta CON MARGEN</div><div class="term-def">Hay tiempo suficiente para hacer el pedido, pero debe planificarse pronto. No requiere acción inmediata.</div></div>
+        <div class="term"><div class="term-word">Alerta OK</div><div class="term-def">El stock actual es suficiente para cubrir todos los planes de producción próximos. No requiere ninguna acción.</div></div>
+        <div class="term"><div class="term-word">OTA Update</div><div class="term-def">Actualización automática que llega a todos los dispositivos al abrir la app, sin pasar por tiendas de aplicaciones.</div></div>
+        <div class="term"><div class="term-word">Plan de Producción</div><div class="term-def">Registro de un lote programado de cerveza: qué estilo, cuándo, cuántos litros y en cuántos lotes.</div></div>
+        <div class="term"><div class="term-word">Receta</div><div class="term-def">Lista de ingredientes con cantidades exactas por lote para elaborar un estilo de cerveza determinado.</div></div>
+        <div class="term"><div class="term-word">Recepción</div><div class="term-def">Registro del ingreso de materias primas al inventario cuando llega un pedido del proveedor.</div></div>
+        <div class="term"><div class="term-word">Estilo</div><div class="term-def">Tipo de cerveza producida (IPA, Stout, Lager, etc.). Cada estilo tiene su propia receta y puede tener una imagen asociada.</div></div>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="doc-footer">
+      <span>Rrëy: JÏT — Guía Ejecutiva · Versión 1.0 · 2026</span>
+      <span>Documento confidencial — Cervecería Rrëy</span>
+    </div>
+
+  </div><!-- /body -->
+</div><!-- /page -->
+
+</body>
+</html>
