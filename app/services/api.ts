@@ -18,22 +18,36 @@ import {
   Supplier,
 } from "../types";
 
-const BASE_URL =
+const PRIMARY_URL =
   (Constants.expoConfig?.extra?.apiUrl as string | undefined) ||
   process.env.EXPO_PUBLIC_API_URL ||
   "https://alexaapp-production.up.railway.app/api";
 
+const BACKUP_URL =
+  process.env.EXPO_PUBLIC_API_URL_BACKUP ||
+  "https://rrey-api-backup.onrender.com/api";
+
 let _accessToken: string | null = null;
 export const setApiToken = (token: string | null) => { _accessToken = token; };
 
+// Tries primary URL first; falls back to backup on network error or 5xx.
+async function fetchWithFailover(primaryUrl: string, backupUrl: string, options: RequestInit): Promise<Response> {
+  try {
+    const res = await fetch(primaryUrl, options);
+    if (res.status >= 500) throw new Error(`HTTP ${res.status}`);
+    return res;
+  } catch {
+    return fetch(backupUrl, options);
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const url = `${BASE_URL}${path}`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
   if (_accessToken) headers["Authorization"] = `Bearer ${_accessToken}`;
-  const res = await fetch(url, { ...options, headers });
+  const res = await fetchWithFailover(`${PRIMARY_URL}${path}`, `${BACKUP_URL}${path}`, { ...options, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error((err as any).error ?? "Request failed");
@@ -45,12 +59,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 async function requestRaw(path: string, options: RequestInit = {}): Promise<Response> {
-  const url = `${BASE_URL}${path}`;
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
   };
   if (_accessToken) headers["Authorization"] = `Bearer ${_accessToken}`;
-  return fetch(url, { ...options, headers });
+  return fetchWithFailover(`${PRIMARY_URL}${path}`, `${BACKUP_URL}${path}`, { ...options, headers });
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
