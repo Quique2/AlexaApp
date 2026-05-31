@@ -12,6 +12,7 @@ import recipesRouter from "./recipes";
 import stylesRouter from "./styles";
 import usersRouter from "./users";
 import adminRouter from "./admin";
+import auditRouter from "./audit";
 
 const router = Router();
 
@@ -28,5 +29,6 @@ router.use("/recipes", recipesRouter);
 router.use("/styles", stylesRouter);
 router.use("/users", usersRouter);
 router.use("/admin", adminRouter);
+router.use("/audit", auditRouter);
 
 export default router;

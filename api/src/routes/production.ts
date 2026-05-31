@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import prisma from "../lib/prisma";
 import { z } from "zod";
 import { requireAuth, AuthRequest } from "../middleware/requireAuth";
+import { logAudit } from "../lib/audit";
 import { requireRole } from "../middleware/requireRole";
 import { canApproveProduction } from "../lib/permissions";
 import type { Role } from "../lib/permissions";
@@ -202,6 +203,15 @@ router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunc
       await Promise.all([...new Set(reqs.map((r) => r.inventoryId))].map(recalculateInventoryAlertStatus));
     }
 
+    await logAudit({
+      userId: actorId,
+      action: "PLAN_CREATED",
+      entityType: "ProductionPlan",
+      entityId: plan.id,
+      entityName: `${plan.style} · ${plan.plannedBatches} lote(s)`,
+      metadata: { style: plan.style, batches: plan.plannedBatches, productionDate: plan.productionDate, approvalStatus },
+    });
+
     res.status(201).json(plan);
   } catch (e) {
     next(e);
@@ -244,6 +254,14 @@ router.post(
       });
       await Promise.all([...new Set(approveReqs.map((r) => r.inventoryId))].map(recalculateInventoryAlertStatus));
 
+      await logAudit({
+        userId: actorId,
+        action: "PLAN_APPROVED",
+        entityType: "ProductionPlan",
+        entityId: plan.id,
+        entityName: `${plan.style} · ${plan.plannedBatches} lote(s)`,
+      });
+
       res.json(updated);
     } catch (e) {
       next(e);
@@ -274,6 +292,14 @@ router.post(
           rejectedAt: new Date(),
           rejectionReason: reason ?? null,
         },
+      });
+      await logAudit({
+        userId: actorId,
+        action: "PLAN_REJECTED",
+        entityType: "ProductionPlan",
+        entityId: plan.id,
+        entityName: `${plan.style} · ${plan.plannedBatches} lote(s)`,
+        metadata: { reason: reason ?? null },
       });
       res.json(updated);
     } catch (e) {
@@ -327,6 +353,14 @@ router.post(
         affectedInventories.map((r) => recalculateInventoryAlertStatus(r.inventoryId))
       );
 
+      await logAudit({
+        userId: (req as AuthRequest).userId,
+        action: "PLAN_SIGNED_OFF",
+        entityType: "ProductionPlan",
+        entityId: plan.id,
+        entityName: `${plan.style} · ${plan.plannedBatches} lote(s)`,
+      });
+
       res.json(updated);
     } catch (e) {
       next(e);
@@ -358,6 +392,15 @@ router.patch(
       } else if (productionStatus === "CANCELLED") {
         await releaseReservedStock(plan.id);
       }
+
+      await logAudit({
+        userId: (req as AuthRequest).userId,
+        action: "PLAN_STATUS_CHANGED",
+        entityType: "ProductionPlan",
+        entityId: plan.id,
+        entityName: `${plan.style} · ${plan.plannedBatches} lote(s)`,
+        metadata: { before: plan.productionStatus, after: productionStatus },
+      });
 
       res.json(updated);
     } catch (e) {

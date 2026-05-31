@@ -3,6 +3,8 @@ import { OrderStatus, PaymentMethod } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { z } from "zod";
 import { syncInventoryState, checkAndAutoSignOffPlan, recalculateInventoryAlertStatus } from "../lib/jit";
+import { requireAuth, AuthRequest } from "../middleware/requireAuth";
+import { logAudit } from "../lib/audit";
 
 const router = Router();
 
@@ -106,7 +108,7 @@ router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // POST /api/orders
-router.post("/", async (req: Request, res: Response, next: NextFunction) => {
+router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = OrderSchema.parse(req.body);
     const material = await prisma.material.findUnique({ where: { id: data.materialId } });
@@ -135,6 +137,14 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
       },
       include: { material: true, supplier: true },
     });
+    await logAudit({
+      userId: (req as AuthRequest).userId,
+      action: "ORDER_CREATED",
+      entityType: "Order",
+      entityId: order.id,
+      entityName: `${order.folio} · ${order.material.name}`,
+      metadata: { quantity: order.orderedQuantity, unit: order.material.unit },
+    });
     res.status(201).json(order);
   } catch (e) {
     next(e);
@@ -161,7 +171,7 @@ router.put("/:id", async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // PATCH /api/orders/:id/confirm-received — register a receipt and sync inventory
-router.patch("/:id/confirm-received", async (req: Request, res: Response, next: NextFunction) => {
+router.patch("/:id/confirm-received", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { receivedQuantity, condition, batchLot, receivedBy, notes, isConforming } = z
       .object({
@@ -230,6 +240,15 @@ router.patch("/:id/confirm-received", async (req: Request, res: Response, next: 
     if (order.productionPlanId) {
       await checkAndAutoSignOffPlan(order.productionPlanId);
     }
+
+    await logAudit({
+      userId: (req as AuthRequest).userId,
+      action: "ORDER_RECEIVED",
+      entityType: "Order",
+      entityId: order.id,
+      entityName: `${order.folio} · ${order.material.name}`,
+      metadata: { receivedQuantity, totalReceived, status: newStatus, condition, isConforming },
+    });
 
     res.json({ reception, orderStatus: newStatus, totalReceived });
   } catch (e) {

@@ -25,6 +25,18 @@ export type Role = "DEVELOPER" | "SUPERVISOR" | "OPERATOR" | "TRANSPORTER";
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type BlockType = "EMAIL" | "IP";
 
+export interface AuditLog {
+  id: string;
+  userId: string | null;
+  user: { id: string; name: string | null; email: string; role: Role } | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  entityName: string | null;
+  metadata: Record<string, any> | null;
+  createdAt: string;
+}
+
 export interface Supplier {
   id: string;
   name: string;

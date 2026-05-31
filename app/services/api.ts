@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
 import {
   AppUser,
+  AuditLog,
   BlockedEntity,
   DashboardSummary,
   GenerateOrdersPreview,
@@ -305,6 +306,20 @@ export const usersApi = {
       method: "POST",
       body: JSON.stringify({ password }),
     }),
+};
+
+// ─── Audit ───────────────────────────────────────────────────────────────────
+export const auditApi = {
+  list: (params?: { limit?: number; offset?: number; userId?: string }) => {
+    const qs = new URLSearchParams(
+      Object.entries(params ?? {})
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, String(v)])
+    ).toString();
+    return request<{ logs: AuditLog[]; total: number; limit: number; offset: number }>(
+      `/audit${qs ? `?${qs}` : ""}`
+    );
+  },
 };
 
 // ─── Admin ───────────────────────────────────────────────────────────────────

@@ -4,9 +4,10 @@ import prisma from "../lib/prisma";
 import { z } from "zod";
 import * as XLSX from "xlsx";
 import multer from "multer";
-import { requireAuth } from "../middleware/requireAuth";
+import { requireAuth, AuthRequest } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
 import { syncInventoryState, roundQty } from "../lib/jit";
+import { logAudit } from "../lib/audit";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -246,6 +247,18 @@ router.put("/:materialId", requireAuth, async (req: Request, res: Response, next
     });
 
     await syncInventoryState(current.id);
+
+    const userId = (req as AuthRequest).userId;
+    if (raw.currentStock !== undefined) {
+      await logAudit({
+        userId,
+        action: "INVENTORY_STOCK_UPDATE",
+        entityType: "Inventory",
+        entityId: current.id,
+        entityName: updated.material.name,
+        metadata: { before: current.currentStock, after: updated.currentStock, unit: updated.material.unit },
+      });
+    }
 
     res.json(updated);
   } catch (e) {

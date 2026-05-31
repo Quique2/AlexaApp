@@ -272,10 +272,27 @@ model User {
   approvedPlans ProductionPlan[] @relation("PlanApprovedBy")
   rejectedPlans ProductionPlan[] @relation("PlanRejectedBy")
   createdPlans  ProductionPlan[] @relation("PlanCreatedBy")
+  auditLogs     AuditLog[]
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
 
   @@map("users")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String
+  entityId   String?
+  entityName String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId])
+  @@map("audit_logs")
 }
 
 model UserSession {

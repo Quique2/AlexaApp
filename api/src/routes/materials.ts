@@ -2,8 +2,9 @@ import { Router, Request, Response, NextFunction } from "express";
 import { MaterialType } from "@prisma/client";
 import prisma from "../lib/prisma";
 import { z } from "zod";
-import { requireAuth } from "../middleware/requireAuth";
+import { requireAuth, AuthRequest } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
+import { logAudit } from "../lib/audit";
 
 const router = Router();
 
@@ -91,10 +92,19 @@ router.put(
       if (typeof unitPrice !== "number" || unitPrice < 0) {
         return res.status(400).json({ error: "unitPrice debe ser un número >= 0" });
       }
+      const existing = await prisma.material.findUnique({ where: { id: req.params.id } });
       const material = await prisma.material.update({
         where: { id: req.params.id },
         data: { unitPrice, priceUnit: priceUnit ?? null },
         include: { supplier: true },
+      });
+      await logAudit({
+        userId: (req as AuthRequest).userId,
+        action: "PRICE_UPDATE",
+        entityType: "Material",
+        entityId: material.id,
+        entityName: material.name,
+        metadata: { before: existing?.unitPrice ?? 0, after: unitPrice, unit: priceUnit ?? material.priceUnit },
       });
       res.json(material);
     } catch (e) { next(e); }
