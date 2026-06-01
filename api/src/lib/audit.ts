@@ -30,7 +30,14 @@ export async function logAudit(params: {
   metadata?: Record<string, any>;
 }): Promise<void> {
   try {
-    await prisma.auditLog.create({ data: params });
+    await prisma.auditLog.create({
+      data: {
+        ...params,
+        userId: params.userId ?? undefined,
+        changes: params.changes as any,
+        metadata: params.metadata as any,
+      },
+    });
   } catch {
     // Non-blocking: audit failures must never break the main flow
   }

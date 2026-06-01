@@ -27,7 +27,7 @@ function buildWhere(params: {
     ...(forUserId ? { userId: forUserId } : {}),
     ...(action ? { action } : {}),
     ...(entityType ? { entityType } : {}),
-    ...(onlyChanges ? { NOT: { changes: Prisma.DbNull } } : {}),
+    ...(onlyChanges ? { changes: { not: Prisma.DbNull } } : {}),
     ...(search
       ? {
           OR: [
