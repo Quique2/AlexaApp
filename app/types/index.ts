@@ -25,6 +25,31 @@ export type Role = "DEVELOPER" | "SUPERVISOR" | "OPERATOR" | "TRANSPORTER";
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type BlockType = "EMAIL" | "IP";
 
+export type JitStatus = "CRITICAL" | "RED" | "YELLOW" | "GREEN" | "NONE";
+
+export interface CalendarPlan {
+  id: string;
+  style: string;
+  batches: number;
+  jitStatus: JitStatus;
+  hasCritical: boolean;
+  approvalStatus: string;
+  productionStatus: string;
+}
+
+export interface ProductionCalendarDay {
+  date: string;
+  highestStatus: JitStatus;
+  hasCritical: boolean;
+  plansCount: number;
+  plans: CalendarPlan[];
+}
+
+export interface ProductionCalendar {
+  month: string;
+  days: ProductionCalendarDay[];
+}
+
 export interface AuditChange {
   field: string;
   label: string;

@@ -4,6 +4,7 @@ import {
   AuditLog,
   AuditGroupedUser,
   BlockedEntity,
+  ProductionCalendar,
   DashboardSummary,
   GenerateOrdersPreview,
   ImportResult,
@@ -112,6 +113,8 @@ export const dashboardApi = {
   },
   spend: () => request<{ month: string; total: number; orders: number }[]>("/dashboard/spend"),
   jitSummary: () => request<JITSummary>("/dashboard/jit-summary"),
+  productionCalendar: (month: string) =>
+    request<ProductionCalendar>(`/dashboard/production-calendar?month=${month}`),
 };
 
 // ─── Inventory ───────────────────────────────────────────────────────────────

@@ -9,6 +9,7 @@ import { spacing, radius, Colors } from "../constants/theme";
 import { useTheme } from "../context/ThemeContext";
 import { EmptyState } from "../components/EmptyState";
 import { DateRangePicker } from "../components/DateRangePicker";
+import { ProductionCalendar } from "../components/ProductionCalendar";
 import { useDashboardSummary } from "../hooks/useDashboard";
 import { useInventoryAlerts } from "../hooks/useInventory";
 import { stylesApi } from "../services/api";
@@ -268,6 +269,14 @@ export default function DashboardScreen() {
           <Text style={typography.caption}>pedidos este mes</Text>
         </View>
       </Pressable>
+
+      {/* ── Production calendar ── */}
+      <SectionRow
+        title="CALENDARIO DE PRODUCCIÓN"
+        colors={colors}
+        typography={typography}
+      />
+      <ProductionCalendar colors={colors} typography={typography} />
 
       {/* ── Upcoming plans ── */}
       {s.upcoming.plans.length > 0 && (

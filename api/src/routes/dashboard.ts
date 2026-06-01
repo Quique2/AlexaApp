@@ -107,6 +107,79 @@ router.get("/summary", async (req: Request, res: Response, next: NextFunction) =
   }
 });
 
+// GET /api/dashboard/production-calendar?month=YYYY-MM
+router.get("/production-calendar", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const now = new Date();
+    const monthParam = req.query.month ? String(req.query.month) : null;
+    const year  = monthParam ? parseInt(monthParam.split("-")[0]) : now.getFullYear();
+    const month = monthParam ? parseInt(monthParam.split("-")[1]) - 1 : now.getMonth();
+
+    const from = new Date(Date.UTC(year, month, 1));
+    const to   = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
+
+    const plans = await prisma.productionPlan.findMany({
+      where: {
+        productionDate: { gte: from, lte: to },
+        productionStatus: { not: "CANCELLED" },
+      },
+      select: {
+        id: true,
+        style: true,
+        plannedBatches: true,
+        productionDate: true,
+        approvalStatus: true,
+        productionStatus: true,
+        requirements: {
+          select: { actionStatus: true, isCritical: true },
+        },
+      },
+      orderBy: { productionDate: "asc" },
+    });
+
+    const STATUS_PRIORITY: Record<string, number> = { CRITICAL: 4, RED: 3, YELLOW: 2, GREEN: 1, NONE: 0 };
+
+    function derivePlanStatus(reqs: { actionStatus: string; isCritical: boolean }[]) {
+      if (!reqs.length) return { status: "NONE", hasCritical: false };
+      const hasCritical = reqs.some((r) => r.isCritical && r.actionStatus === "ORDER_NOW");
+      if (hasCritical)                               return { status: "CRITICAL", hasCritical: true };
+      if (reqs.some((r) => r.actionStatus === "ORDER_NOW"))  return { status: "RED",      hasCritical: false };
+      if (reqs.some((r) => r.actionStatus === "ORDER_SOON")) return { status: "YELLOW",   hasCritical: false };
+      return { status: "GREEN", hasCritical: false };
+    }
+
+    // Group by day (YYYY-MM-DD)
+    const dayMap = new Map<string, typeof plans>();
+    for (const plan of plans) {
+      const key = plan.productionDate.toISOString().split("T")[0];
+      if (!dayMap.has(key)) dayMap.set(key, []);
+      dayMap.get(key)!.push(plan);
+    }
+
+    const days = [];
+    for (const [date, dayPlans] of dayMap) {
+      const processed = dayPlans.map((p) => {
+        const { status, hasCritical } = derivePlanStatus(p.requirements);
+        return { id: p.id, style: p.style, batches: p.plannedBatches, jitStatus: status, hasCritical, approvalStatus: p.approvalStatus, productionStatus: p.productionStatus };
+      });
+
+      let highestStatus = "NONE";
+      let dayHasCritical = false;
+      for (const p of processed) {
+        if ((STATUS_PRIORITY[p.jitStatus] ?? 0) > (STATUS_PRIORITY[highestStatus] ?? 0)) highestStatus = p.jitStatus;
+        if (p.hasCritical) dayHasCritical = true;
+      }
+
+      days.push({ date, highestStatus, hasCritical: dayHasCritical, plansCount: processed.length, plans: processed });
+    }
+
+    days.sort((a, b) => a.date.localeCompare(b.date));
+    res.json({ month: `${year}-${String(month + 1).padStart(2, "0")}`, days });
+  } catch (e) {
+    next(e);
+  }
+});
+
 // GET /api/dashboard/jit-summary — JIT status across all active approved plans
 router.get("/jit-summary", async (_req: Request, res: Response, next: NextFunction) => {
   try {
