@@ -206,36 +206,38 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     overflow: "hidden",
+    maxWidth: 360,
+    alignSelf: "center",
+    width: "100%",
   },
   rangeRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs + 2,
     paddingHorizontal: spacing.md,
     borderBottomWidth: 1,
     gap: spacing.sm,
   },
   rangeLabel: {
-    flex: 1, alignItems: "center", paddingBottom: 4, gap: 2,
+    flex: 1, alignItems: "center", paddingBottom: 2, gap: 1,
   },
   navRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2,
   },
   navBtn: { padding: spacing.xs },
   weekdayRow: {
-    flexDirection: "row", paddingHorizontal: spacing.xs, marginBottom: 2,
+    flexDirection: "row", paddingHorizontal: spacing.xs,
   },
   weekdayCell: {
-    flex: 1, textAlign: "center", paddingVertical: 4,
+    width: 44, textAlign: "center", paddingVertical: 3,
   },
   weekRow: {
     flexDirection: "row", paddingHorizontal: spacing.xs,
   },
   dayCell: {
-    flex: 1, aspectRatio: 1, alignItems: "center", justifyContent: "center",
-    marginVertical: 1,
+    width: 44, height: 36, alignItems: "center", justifyContent: "center",
   },
   todayRing: {
     borderRadius: radius.full, borderWidth: 1,
