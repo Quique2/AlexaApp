@@ -1,13 +1,14 @@
 import React, { useMemo, useState } from "react";
 import {
   ScrollView, View, Text, StyleSheet, RefreshControl,
-  Pressable, ActivityIndicator, TextInput, Platform,
+  Pressable, ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { spacing, radius, Colors } from "../constants/theme";
 import { useTheme } from "../context/ThemeContext";
 import { EmptyState } from "../components/EmptyState";
+import { DateRangePicker } from "../components/DateRangePicker";
 import { useDashboardSummary } from "../hooks/useDashboard";
 import { useInventoryAlerts } from "../hooks/useInventory";
 import { stylesApi } from "../services/api";
@@ -179,13 +180,15 @@ export default function DashboardScreen() {
         })}
       </View>
 
-      {/* ── Custom date inputs ── */}
+      {/* ── Custom calendar ── */}
       {preset === "custom" && (
-        <View style={[styles.dateRow, { borderBottomColor: colors.border }]}>
-          <DateInput label="Desde" value={from} onChange={(v) => setFrom(v)} colors={colors} typography={typography} />
-          <View style={[styles.dateSep, { backgroundColor: colors.border }]} />
-          <DateInput label="Hasta" value={to} onChange={(v) => setTo(v)} colors={colors} typography={typography} />
-        </View>
+        <DateRangePicker
+          from={from}
+          to={to}
+          onChange={(f, t) => { setFrom(f); setTo(t); }}
+          colors={colors}
+          typography={typography}
+        />
       )}
 
       {/* ── Material type selector ── */}
@@ -328,50 +331,6 @@ export default function DashboardScreen() {
 
 // ─── DateInput ────────────────────────────────────────────────────────────────
 
-function DateInput({
-  label, value, onChange, colors, typography,
-}: {
-  label: string; value: string; onChange: (v: string) => void;
-  colors: Colors; typography: any;
-}) {
-  if (Platform.OS === "web") {
-    return (
-      <View style={{ flex: 1, alignItems: "center" }}>
-        <Text style={[typography.label, { fontSize: 9, color: colors.textMuted, marginBottom: 2 }]}>{label}</Text>
-        <input
-          type="date"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          style={{
-            backgroundColor: "transparent",
-            border: "none",
-            color: colors.textPrimary,
-            fontSize: 13,
-            fontFamily: "inherit",
-            outline: "none",
-            textAlign: "center",
-            width: "100%",
-          }}
-        />
-      </View>
-    );
-  }
-  return (
-    <View style={{ flex: 1, alignItems: "center" }}>
-      <Text style={[typography.label, { fontSize: 9, color: colors.textMuted, marginBottom: 2 }]}>{label}</Text>
-      <TextInput
-        style={[typography.bodySmall, { color: colors.textPrimary, textAlign: "center" }]}
-        value={value}
-        onChangeText={onChange}
-        placeholder="AAAA-MM-DD"
-        placeholderTextColor={colors.textMuted}
-        keyboardType="numbers-and-punctuation"
-        maxLength={10}
-      />
-    </View>
-  );
-}
-
 // ─── StripCell ────────────────────────────────────────────────────────────────
 
 function StripCell({
@@ -511,11 +470,6 @@ function makeStyles(colors: Colors) {
       flexDirection: "row", gap: spacing.xs, paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm, borderBottomWidth: 1,
     },
-    dateRow: {
-      flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm, borderBottomWidth: 1,
-    },
-    dateSep: { width: 1, height: 28, marginHorizontal: spacing.sm },
     materialRow: {
       flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm, borderBottomWidth: 1, marginBottom: spacing.md,
