@@ -318,13 +318,23 @@ export function AuditHistorial() {
   }, [debouncedSearch, entityFilter, isPrivileged]);
 
   const handleExport = async () => {
+    if (Platform.OS !== "web") {
+      Alert.alert("Exportar", "La descarga de Excel está disponible solo en la versión web.");
+      return;
+    }
     try {
       const res = await auditApi.exportRaw({
         search: debouncedSearch || undefined,
         entityType: entityFilter ?? undefined,
       });
       if (!res.ok) throw new Error("Error al exportar");
-      Alert.alert("Exportar", "La exportación se descargará en el navegador. Abre el enlace de auditoría en web para descargar el Excel.");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `auditoria_${new Date().toISOString().split("T")[0]}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
     } catch {
       Alert.alert("Error", "No se pudo exportar la auditoría");
     }
