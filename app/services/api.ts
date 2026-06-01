@@ -34,6 +34,8 @@ const BACKUP_URL =
 
 let _accessToken: string | null = null;
 export const setApiToken = (token: string | null) => { _accessToken = token; };
+export const getApiToken = () => _accessToken;
+export const getApiBaseUrl = () => PRIMARY_URL;
 
 // Tries primary URL first; falls back to backup on network error or 5xx.
 async function fetchWithFailover(primaryUrl: string, backupUrl: string, options: RequestInit): Promise<Response> {

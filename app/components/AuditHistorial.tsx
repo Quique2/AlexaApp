@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { spacing, radius, Colors } from "../constants/theme";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
-import { auditApi } from "../services/api";
+import { auditApi, getApiToken, getApiBaseUrl } from "../services/api";
 import { useSettingNumber, useSettingBool } from "../hooks/useSettings";
 import { EmptyState } from "./EmptyState";
 import type { AuditChange, AuditGroupedUser, AuditLog, Role } from "../types";
@@ -318,23 +318,63 @@ export function AuditHistorial() {
   }, [debouncedSearch, entityFilter, isPrivileged]);
 
   const handleExport = async () => {
-    if (Platform.OS !== "web") {
-      Alert.alert("Exportar", "La descarga de Excel está disponible solo en la versión web.");
+    const fileName = `auditoria_${new Date().toISOString().split("T")[0]}.xlsx`;
+
+    if (Platform.OS === "web") {
+      try {
+        const res = await auditApi.exportRaw({
+          search: debouncedSearch || undefined,
+          entityType: entityFilter ?? undefined,
+        });
+        if (!res.ok) throw new Error("Error al exportar");
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch {
+        Alert.alert("Error", "No se pudo exportar la auditoría");
+      }
       return;
     }
+
+    // Mobile: download authenticated file to disk, then open share sheet.
+    // Modules are loaded lazily so older installed APKs without these native
+    // modules degrade gracefully instead of crashing the whole screen.
+    let FileSystem: any, Sharing: any;
     try {
-      const res = await auditApi.exportRaw({
-        search: debouncedSearch || undefined,
-        entityType: entityFilter ?? undefined,
+      FileSystem = require("expo-file-system/legacy");
+      Sharing = require("expo-sharing");
+    } catch {
+      Alert.alert("Exportar", "Actualiza la app a la última versión para descargar en móvil.");
+      return;
+    }
+
+    try {
+      const qs = new URLSearchParams();
+      if (debouncedSearch) qs.append("search", debouncedSearch);
+      if (entityFilter) qs.append("entityType", entityFilter);
+      const queryStr = qs.toString();
+      const url = `${getApiBaseUrl()}/audit/export${queryStr ? `?${queryStr}` : ""}`;
+      const token = getApiToken();
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+
+      const { uri, status } = await FileSystem.downloadAsync(url, fileUri, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      if (!res.ok) throw new Error("Error al exportar");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `auditoria_${new Date().toISOString().split("T")[0]}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
+      if (status !== 200) throw new Error("Error al exportar");
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          dialogTitle: "Exportar auditoría",
+          UTI: "org.openxmlformats.spreadsheetml.sheet",
+        });
+      } else {
+        Alert.alert("Exportar", `Archivo guardado en: ${uri}`);
+      }
     } catch {
       Alert.alert("Error", "No se pudo exportar la auditoría");
     }
