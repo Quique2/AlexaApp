@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import * as XLSX from "xlsx";
 import prisma from "../lib/prisma";
 import { requireAuth, AuthRequest } from "../middleware/requireAuth";
-import { getSettingNumber } from "../lib/settings";
+import { getSettingNumber, getSettingBool } from "../lib/settings";
 
 const router = Router();
 
@@ -184,6 +184,10 @@ router.get("/", requireAuth, async (req: Request, res: Response, next: NextFunct
 // GET /api/audit/export — Excel download
 router.get("/export", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const enableExcelExport = await getSettingBool("audit", "enableExcelExport", true);
+    if (!enableExcelExport) {
+      return res.status(403).json({ error: "La exportación a Excel está desactivada en los ajustes" });
+    }
     const actorId = (req as AuthRequest).userId;
     const role = await getActorRole(actorId);
     const forUserId = isPrivileged(role)

@@ -1,5 +1,6 @@
 import { Request } from "express";
 import prisma from "./prisma";
+import { getSettingBool } from "./settings";
 
 export interface AuditChange {
   field: string;
@@ -30,11 +31,12 @@ export async function logAudit(params: {
   metadata?: Record<string, any>;
 }): Promise<void> {
   try {
+    const enableChangeTracking = await getSettingBool("audit", "enableChangeTracking", true);
     await prisma.auditLog.create({
       data: {
         ...params,
         userId: params.userId ?? undefined,
-        changes: params.changes as any,
+        changes: enableChangeTracking ? (params.changes as any) : undefined,
         metadata: params.metadata as any,
       },
     });

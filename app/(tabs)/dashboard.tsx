@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {
   ScrollView, View, Text, StyleSheet, RefreshControl,
   Pressable, ActivityIndicator,
@@ -11,7 +11,7 @@ import { EmptyState } from "../components/EmptyState";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { ProductionCalendar } from "../components/ProductionCalendar";
 import { useDashboardSummary } from "../hooks/useDashboard";
-import { useSettingBool, useSettingNumber } from "../hooks/useSettings";
+import { useSettingBool, useSettingNumber, useSetting } from "../hooks/useSettings";
 import { useInventoryAlerts } from "../hooks/useInventory";
 import { stylesApi } from "../services/api";
 import { StyleImage } from "../components/StyleImage";
@@ -77,9 +77,6 @@ const MATERIAL_UNITS: Record<string, string> = {
   MALTA: "kg", LUPULO: "kg", YEAST: "g", ADJUNTO: "kg", OTRO: "u",
 };
 
-const MXN = (n: number) =>
-  n.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
@@ -89,11 +86,17 @@ export default function DashboardScreen() {
 
   // Settings
   const defaultDays    = useSettingNumber("general",   "defaultDashboardDays",   7);
+  const currency       = useSetting("general",         "currency",               "MXN");
   const showCalendar   = useSettingBool("dashboard",   "showProductionCalendar", true);
   const showSpend      = useSettingBool("dashboard",   "showSpendCard",          true);
   const showJITStrip   = useSettingBool("dashboard",   "showJITStrip",           true);
   const plansLimit     = useSettingNumber("dashboard", "upcomingPlansLimit",      4);
   const urgentLimit    = useSettingNumber("dashboard", "urgentItemsLimit",        5);
+
+  const fmtCurrency = useCallback(
+    (n: number) => n.toLocaleString("es-MX", { style: "currency", currency, maximumFractionDigits: 0 }),
+    [currency]
+  );
 
   const today = todayISO();
   const [preset, setPreset] = useState<Preset>("7d");
@@ -282,7 +285,7 @@ export default function DashboardScreen() {
         <View>
           <Text style={[typography.label, { fontSize: 10, marginBottom: 4 }]}>GASTO DEL MES</Text>
           <Text style={[typography.h2, { color: colors.gold, letterSpacing: -0.5 }]}>
-            {MXN(s.monthlySpend.total)}
+            {fmtCurrency(s.monthlySpend.total)}
           </Text>
         </View>
         <View style={{ alignItems: "flex-end" }}>

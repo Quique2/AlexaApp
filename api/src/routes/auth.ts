@@ -122,15 +122,18 @@ router.post("/login", async (req: Request, res: Response) => {
   if (!user.isActive) return res.status(403).json({ error: "Cuenta desactivada" });
 
   const { accessToken, refreshToken } = await createSession(user.id);
-  await logAudit({
-    userId: user.id,
-    action: "USER_LOGIN",
-    entityType: "User",
-    entityId: user.id,
-    entityName: user.name ?? user.email,
-    description: `Inicio de sesión: ${user.email}`,
-    ipAddress: extractIp(req),
-  });
+  const logLogin = await getSettingBool("audit", "logLoginLogout", true);
+  if (logLogin) {
+    await logAudit({
+      userId: user.id,
+      action: "USER_LOGIN",
+      entityType: "User",
+      entityId: user.id,
+      entityName: user.name ?? user.email,
+      description: `Inicio de sesión: ${user.email}`,
+      ipAddress: extractIp(req),
+    });
+  }
   res.json({
     accessToken,
     refreshToken,
@@ -187,14 +190,17 @@ router.post("/logout", async (req: Request, res: Response) => {
     const session = await prisma.userSession.findUnique({ where: { refreshToken } }).catch(() => null);
     await prisma.userSession.deleteMany({ where: { refreshToken } }).catch(() => {});
     if (session?.userId) {
-      await logAudit({
-        userId: session.userId,
-        action: "USER_LOGOUT",
-        entityType: "User",
-        entityId: session.userId,
-        description: "Cierre de sesión",
-        ipAddress: extractIp(req),
-      });
+      const logLogout = await getSettingBool("audit", "logLoginLogout", true);
+      if (logLogout) {
+        await logAudit({
+          userId: session.userId,
+          action: "USER_LOGOUT",
+          entityType: "User",
+          entityId: session.userId,
+          description: "Cierre de sesión",
+          ipAddress: extractIp(req),
+        });
+      }
     }
   }
   res.json({ ok: true });

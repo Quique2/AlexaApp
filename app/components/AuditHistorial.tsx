@@ -9,7 +9,7 @@ import { spacing, radius, Colors } from "../constants/theme";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { auditApi } from "../services/api";
-import { useSettingNumber } from "../hooks/useSettings";
+import { useSettingNumber, useSettingBool } from "../hooks/useSettings";
 import { EmptyState } from "./EmptyState";
 import type { AuditChange, AuditGroupedUser, AuditLog, Role } from "../types";
 
@@ -140,6 +140,7 @@ function AuditEntry({ log, colors, typography, compact = false }: {
   const { icon, color } = getActionMeta(log.action, colors);
   const userName = log.user?.name ?? log.user?.email ?? "Sistema";
   const changes = deriveChanges(log);
+  const showIP = useSettingBool("audit", "showIPAddress", true);
 
   return (
     <View style={[entryStyles.row, { borderBottomColor: colors.border }]}>
@@ -170,7 +171,7 @@ function AuditEntry({ log, colors, typography, compact = false }: {
                 </Text>
               </View>
             )}
-            {log.ipAddress && log.ipAddress !== "unknown" && (
+            {showIP && log.ipAddress && log.ipAddress !== "unknown" && (
               <Text style={[typography.label, { fontSize: 9, color: colors.textMuted }]}>
                 IP: {log.ipAddress}
               </Text>
@@ -272,6 +273,7 @@ export function AuditHistorial() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const isPrivileged = hasRole(["DEVELOPER", "SUPERVISOR"]);
   const recentLimit = useSettingNumber("audit", "recentAuditLimit", 50);
+  const excelExportEnabled = useSettingBool("audit", "enableExcelExport", true);
 
   const [search, setSearch] = useState("");
   const [entityFilter, setEntityFilter] = useState<string | null>(null);
@@ -351,7 +353,7 @@ export function AuditHistorial() {
             </Pressable>
           )}
         </View>
-        {isPrivileged && (
+        {isPrivileged && excelExportEnabled && (
           <Pressable style={[styles.exportBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={handleExport}>
             <Ionicons name="download-outline" size={16} color={colors.gold} />
           </Pressable>

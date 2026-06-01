@@ -247,7 +247,10 @@ router.patch("/:id/confirm-received", requireAuth, async (req: Request, res: Res
         where: { id: inventory.id },
         data: { currentStock: { increment: receivedQuantity } },
       });
-      await syncInventoryState(inventory.id);
+      const recalcInventory = await getSettingBool("orders", "recalcInventoryOnReceive", true);
+      if (recalcInventory) {
+        await syncInventoryState(inventory.id);
+      }
     }
 
     // Auto sign-off the plan if all its orders are now fully received

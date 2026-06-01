@@ -409,6 +409,12 @@ router.patch(
       if (productionStatus === "COMPLETED") {
         await consumeStockForPlan(plan.id);
       } else if (productionStatus === "CANCELLED") {
+        if (plan.approvalStatus === "APPROVED") {
+          const allowCancelApproved = await getSettingBool("production", "allowCancelApproved", true);
+          if (!allowCancelApproved) {
+            return res.status(403).json({ error: "La cancelación de planes aprobados está desactivada en los ajustes" });
+          }
+        }
         await releaseReservedStock(plan.id);
       }
 
@@ -436,6 +442,13 @@ router.put("/:id", requireAuth, async (req: Request, res: Response, next: NextFu
     const data = PlanSchema.partial().parse(req.body);
     const existing = await prisma.productionPlan.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: "Plan not found" });
+
+    if (existing.approvalStatus === "APPROVED") {
+      const allowEditApproved = await getSettingBool("production", "allowEditApproved", true);
+      if (!allowEditApproved) {
+        return res.status(403).json({ error: "La edición de planes aprobados está desactivada en los ajustes" });
+      }
+    }
 
     const batches = data.plannedBatches ?? existing.plannedBatches;
     const maltPer = data.maltKgPerBatch ?? existing.maltKgPerBatch;
