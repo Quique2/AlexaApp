@@ -65,6 +65,30 @@ function getActionMeta(action: string, colors: Colors) {
   };
 }
 
+// Fallback: derives changes from old metadata format for records created before the schema upgrade
+function deriveChanges(log: AuditLog): AuditChange[] {
+  if (Array.isArray(log.changes) && log.changes.length > 0) return log.changes as AuditChange[];
+  const m = log.metadata as Record<string, any> | null;
+  if (!m) return [];
+  switch (log.action) {
+    case "INVENTORY_STOCK_UPDATE":
+      return [{ field: "currentStock", label: "Stock", oldValue: m.before, newValue: m.after, unit: m.unit }];
+    case "PRICE_UPDATE":
+      return [{ field: "unitPrice", label: "Precio", oldValue: m.before, newValue: m.after, unit: m.unit ?? "MXN" }];
+    case "ORDER_CREATED":
+      return [{ field: "orderedQuantity", label: "Cantidad", oldValue: 0, newValue: m.quantity, unit: m.unit }];
+    case "ORDER_RECEIVED":
+      return [
+        { field: "status", label: "Estado", oldValue: m.status?.replace("RECEIVED_", "") ?? null, newValue: m.status },
+        { field: "receivedQuantity", label: "Cantidad recibida", oldValue: 0, newValue: m.receivedQuantity },
+      ];
+    case "PLAN_STATUS_CHANGED":
+      return [{ field: "productionStatus", label: "Estado producción", oldValue: m.before, newValue: m.after }];
+    default:
+      return [];
+  }
+}
+
 function formatRelativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
@@ -114,7 +138,7 @@ function AuditEntry({ log, colors, typography, compact = false }: {
 }) {
   const { icon, color } = getActionMeta(log.action, colors);
   const userName = log.user?.name ?? log.user?.email ?? "Sistema";
-  const changes = Array.isArray(log.changes) ? log.changes as AuditChange[] : [];
+  const changes = deriveChanges(log);
 
   return (
     <View style={[entryStyles.row, { borderBottomColor: colors.border }]}>
