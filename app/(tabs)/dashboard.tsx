@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
   ScrollView, View, Text, StyleSheet, RefreshControl,
   Pressable, ActivityIndicator,
@@ -11,6 +11,7 @@ import { EmptyState } from "../components/EmptyState";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { ProductionCalendar } from "../components/ProductionCalendar";
 import { useDashboardSummary } from "../hooks/useDashboard";
+import { useSettingBool, useSettingNumber } from "../hooks/useSettings";
 import { useInventoryAlerts } from "../hooks/useInventory";
 import { stylesApi } from "../services/api";
 import { StyleImage } from "../components/StyleImage";
@@ -86,11 +87,31 @@ export default function DashboardScreen() {
   const { colors, typography } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
+  // Settings
+  const defaultDays    = useSettingNumber("general",   "defaultDashboardDays",   7);
+  const showCalendar   = useSettingBool("dashboard",   "showProductionCalendar", true);
+  const showSpend      = useSettingBool("dashboard",   "showSpendCard",          true);
+  const showJITStrip   = useSettingBool("dashboard",   "showJITStrip",           true);
+  const plansLimit     = useSettingNumber("dashboard", "upcomingPlansLimit",      4);
+  const urgentLimit    = useSettingNumber("dashboard", "urgentItemsLimit",        5);
+
   const today = todayISO();
   const [preset, setPreset] = useState<Preset>("7d");
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(addDays(today, 7));
   const [materialType, setMaterialType] = useState("MALTA");
+  const settingsInitialized = useRef(false);
+
+  // Apply defaultDashboardDays setting once on first load
+  useEffect(() => {
+    if (settingsInitialized.current) return;
+    settingsInitialized.current = true;
+    if (defaultDays === 7) return; // already the default
+    const p: Preset = defaultDays === 15 ? "15d" : defaultDays === 30 ? "30d" : "7d";
+    setPreset(p);
+    setFrom(today);
+    setTo(addDays(today, defaultDays));
+  }, [defaultDays]);
 
   const applyPreset = (p: Preset) => {
     setPreset(p);
@@ -219,7 +240,7 @@ export default function DashboardScreen() {
       </View>
 
       {/* ── Alert strip (global JIT status) ── */}
-      <Pressable
+      {showJITStrip && <Pressable
         style={[styles.alertStrip, { backgroundColor: colors.card, borderColor: colors.border }]}
         onPress={() => router.push("/inventory")}
       >
@@ -230,7 +251,7 @@ export default function DashboardScreen() {
         <StripCell value={s.alerts.yellow}   label="CON MARGEN" activeColor={colors.yellow} activeBg={colors.yellowBg} colors={colors} typography={typography} />
         <View style={[styles.stripDiv, { backgroundColor: colors.border }]} />
         <StripCell value={s.alerts.ok}       label="VISTO BUENO" activeColor={colors.green} activeBg={colors.greenBg}  colors={colors} typography={typography} />
-      </Pressable>
+      </Pressable>}
 
       {/* ── KPI tiles ── */}
       <View style={styles.kpiRow}>
@@ -253,8 +274,8 @@ export default function DashboardScreen() {
         />
       </View>
 
-      {/* ── Spend card (always current month) ── */}
-      <Pressable
+      {/* ── Spend card ── */}
+      {showSpend && <Pressable
         style={[styles.spendCard, { backgroundColor: colors.card, borderColor: colors.border }]}
         onPress={() => router.push("/orders")}
       >
@@ -268,15 +289,17 @@ export default function DashboardScreen() {
           <Text style={[typography.h3, { color: colors.textPrimary }]}>{s.monthlySpend.orderCount}</Text>
           <Text style={typography.caption}>pedidos este mes</Text>
         </View>
-      </Pressable>
+      </Pressable>}
 
       {/* ── Production calendar ── */}
-      <SectionRow
-        title="CALENDARIO DE PRODUCCIÓN"
-        colors={colors}
-        typography={typography}
-      />
-      <ProductionCalendar colors={colors} typography={typography} />
+      {showCalendar && <>
+        <SectionRow
+          title="CALENDARIO DE PRODUCCIÓN"
+          colors={colors}
+          typography={typography}
+        />
+        <ProductionCalendar colors={colors} typography={typography} />
+      </>}
 
       {/* ── Upcoming plans ── */}
       {s.upcoming.plans.length > 0 && (
@@ -289,13 +312,13 @@ export default function DashboardScreen() {
             typography={typography}
           />
           <View style={[styles.list, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {s.upcoming.plans.slice(0, 4).map((plan, i) => (
+            {s.upcoming.plans.slice(0, plansLimit).map((plan, i) => (
               <PlanRow
                 key={plan.id}
                 plan={plan}
                 colors={colors}
                 typography={typography}
-                isLast={i === Math.min(s.upcoming.plans.length, 4) - 1}
+                isLast={i === Math.min(s.upcoming.plans.length, plansLimit) - 1}
               />
             ))}
           </View>
@@ -314,13 +337,13 @@ export default function DashboardScreen() {
             typography={typography}
           />
           <View style={[styles.list, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {urgentItems.slice(0, 5).map((item, i) => (
+            {urgentItems.slice(0, urgentLimit).map((item, i) => (
               <UrgentItem
                 key={item.id}
                 item={item}
                 colors={colors}
                 typography={typography}
-                isLast={i === Math.min(urgentItems.length, 5) - 1}
+                isLast={i === Math.min(urgentItems.length, urgentLimit) - 1}
               />
             ))}
           </View>

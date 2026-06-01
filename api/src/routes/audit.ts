@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import * as XLSX from "xlsx";
 import prisma from "../lib/prisma";
 import { requireAuth, AuthRequest } from "../middleware/requireAuth";
+import { getSettingNumber } from "../lib/settings";
 
 const router = Router();
 
@@ -51,12 +52,13 @@ router.get("/recent", requireAuth, async (req: Request, res: Response, next: Nex
     const actorId = (req as AuthRequest).userId;
     const role = await getActorRole(actorId);
     const forUserId = isPrivileged(role) ? undefined : actorId;
+    const recentLimit = await getSettingNumber("audit", "recentAuditLimit", 50);
 
     const logs = await prisma.auditLog.findMany({
       where: forUserId ? { userId: forUserId } : {},
       include: { user: { select: userSelect } },
       orderBy: { createdAt: "desc" },
-      take: 10,
+      take: Math.min(recentLimit, 100),
     });
     res.json(logs);
   } catch (e) {

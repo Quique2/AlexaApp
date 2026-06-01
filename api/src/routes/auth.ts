@@ -6,6 +6,7 @@ import prisma from "../lib/prisma";
 import { requireAuth, AuthRequest } from "../middleware/requireAuth";
 import { getClientIp } from "../middleware/requireActive";
 import { logAudit, extractIp } from "../lib/audit";
+import { getSettingBool, getSettingNumber } from "../lib/settings";
 
 const router = Router();
 
@@ -54,11 +55,23 @@ const registerSchema = z.object({
 });
 
 router.post("/register", async (req: Request, res: Response) => {
+  const [allowPublicRegister, passwordMinLength] = await Promise.all([
+    getSettingBool("security", "allowPublicRegister", false),
+    getSettingNumber("security", "passwordMinLength", 8),
+  ]);
+  if (!allowPublicRegister) {
+    return res.status(403).json({ error: "El registro público está desactivado. Contacta a un administrador." });
+  }
+
   const parse = registerSchema.safeParse(req.body);
   if (!parse.success) {
     return res.status(400).json({ error: parse.error.flatten().fieldErrors });
   }
   const { email, password, name } = parse.data;
+
+  if (password.length < passwordMinLength) {
+    return res.status(400).json({ error: `La contraseña debe tener al menos ${passwordMinLength} caracteres` });
+  }
 
   const blocked = await checkBlocks(req, email);
   if (blocked) return res.status(403).json({ error: blocked });

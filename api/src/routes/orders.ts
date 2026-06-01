@@ -5,6 +5,7 @@ import { z } from "zod";
 import { syncInventoryState, checkAndAutoSignOffPlan, recalculateInventoryAlertStatus } from "../lib/jit";
 import { requireAuth, AuthRequest } from "../middleware/requireAuth";
 import { logAudit, extractIp } from "../lib/audit";
+import { getSettingBool, getSettingNumber } from "../lib/settings";
 
 const router = Router();
 
@@ -205,6 +206,7 @@ router.patch("/:id/confirm-received", requireAuth, async (req: Request, res: Res
     if (["RECEIVED_COMPLETE", "CANCELLED"].includes(order.status)) {
       return res.status(409).json({ error: "La orden ya está cerrada o cancelada" });
     }
+    const allowPartialReception = await getSettingBool("orders", "allowPartialReception", true);
 
     // Create reception record
     const reception = await prisma.reception.create({
@@ -225,6 +227,10 @@ router.patch("/:id/confirm-received", requireAuth, async (req: Request, res: Res
       .filter((r) => r.isConforming)
       .reduce((s, r) => s + r.receivedQuantity, 0);
     const totalReceived = previousConformingTotal + (isConforming ? receivedQuantity : 0);
+
+    if (!allowPartialReception && isConforming && totalReceived < order.orderedQuantity) {
+      return res.status(409).json({ error: "La recepción parcial está desactivada. Ingresa la cantidad completa del pedido." });
+    }
 
     const newStatus: OrderStatus =
       totalReceived >= order.orderedQuantity ? "RECEIVED_COMPLETE" : "RECEIVED_PARTIAL";

@@ -3,6 +3,7 @@ import { z } from "zod";
 import prisma from "../lib/prisma";
 import { requireAuth, AuthRequest } from "../middleware/requireAuth";
 import { logAudit, extractIp } from "../lib/audit";
+import { invalidateSettingCache } from "../lib/settings";
 
 const router = Router();
 
@@ -235,6 +236,8 @@ router.put("/:category/:key", requireAuth, async (req: Request, res: Response, n
       update: { value, updatedById: actorId },
       create: { category, key, value, updatedById: actorId },
     });
+
+    invalidateSettingCache(category, key);
 
     await logAudit({
       userId: actorId,

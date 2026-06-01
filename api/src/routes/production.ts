@@ -3,6 +3,7 @@ import prisma from "../lib/prisma";
 import { z } from "zod";
 import { requireAuth, AuthRequest } from "../middleware/requireAuth";
 import { logAudit, extractIp } from "../lib/audit";
+import { getSettingBool, getSettingNumber } from "../lib/settings";
 import { requireRole } from "../middleware/requireRole";
 import { canApproveProduction } from "../lib/permissions";
 import type { Role } from "../lib/permissions";
@@ -172,7 +173,16 @@ router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunc
     });
     const actorRole = (actor?.role ?? "OPERATOR") as Role;
 
-    const approvalStatus = canApproveProduction(actorRole) ? "APPROVED" : "PENDING";
+    const [requireApproval, operatorsCanCreate] = await Promise.all([
+      getSettingBool("production", "requireApproval", true),
+      getSettingBool("production", "operatorsCanCreate", true),
+    ]);
+
+    if (!operatorsCanCreate && actorRole === "OPERATOR") {
+      return res.status(403).json({ error: "Los operadores no tienen permiso para crear planes de producción" });
+    }
+
+    const approvalStatus = !requireApproval || canApproveProduction(actorRole) ? "APPROVED" : "PENDING";
     const { estimatedCost, hasMissingPrices } = await computePlanCost(data.style, data.plannedBatches);
 
     const plan = await prisma.productionPlan.create({
@@ -578,9 +588,10 @@ router.post(
 
       const now = new Date();
       const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const defaultETADays = await getSettingNumber("orders", "defaultETADays", 7);
 
       const preview = requirements.map((req) => {
-        const daysToOrder = req.material.supplier?.daysToOrder ?? 7;
+        const daysToOrder = req.material.supplier?.daysToOrder ?? defaultETADays;
 
         // Compute JIT timing status for this item:
         // - missingQuantity = 0 → no alert needed
@@ -636,7 +647,7 @@ router.post(
         const supplier = p.supplierId
           ? await prisma.supplier.findUnique({ where: { id: p.supplierId } })
           : null;
-        const daysToOrder = supplier?.daysToOrder ?? 7;
+        const daysToOrder = supplier?.daysToOrder ?? defaultETADays;
         const arrival = new Date(now);
         arrival.setDate(arrival.getDate() + daysToOrder);
 

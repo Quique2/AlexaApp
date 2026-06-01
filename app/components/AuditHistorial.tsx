@@ -9,6 +9,7 @@ import { spacing, radius, Colors } from "../constants/theme";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
 import { auditApi } from "../services/api";
+import { useSettingNumber } from "../hooks/useSettings";
 import { EmptyState } from "./EmptyState";
 import type { AuditChange, AuditGroupedUser, AuditLog, Role } from "../types";
 
@@ -270,6 +271,7 @@ export function AuditHistorial() {
   const { hasRole } = useAuth();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const isPrivileged = hasRole(["DEVELOPER", "SUPERVISOR"]);
+  const recentLimit = useSettingNumber("audit", "recentAuditLimit", 50);
 
   const [search, setSearch] = useState("");
   const [entityFilter, setEntityFilter] = useState<string | null>(null);
@@ -302,7 +304,7 @@ export function AuditHistorial() {
 
   const { data: ownData, isLoading: ownLoading, refetch: refetchOwn } = useQuery({
     queryKey: ["audit", "own"],
-    queryFn: () => auditApi.list({ limit: 50 }),
+    queryFn: () => auditApi.list({ limit: recentLimit }),
     enabled: !isPrivileged,
   });
 
