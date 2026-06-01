@@ -14,6 +14,7 @@ import { useUsers, useCreateUser, useUpdateUser, useResetPassword } from "../hoo
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminApi } from "../services/api";
 import { AuditHistorial } from "../components/AuditHistorial";
+import { SettingsPanel } from "../components/SettingsPanel";
 import type { AppUser, Role, BlockedEntity } from "../types";
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -33,7 +34,7 @@ const ROLE_COLORS: Record<Role, string> = {
 const ASSIGNABLE_ROLES: Role[] = ["SUPERVISOR", "OPERATOR", "TRANSPORTER"];
 const ALL_ROLES: Role[] = ["DEVELOPER", "SUPERVISOR", "OPERATOR", "TRANSPORTER"];
 
-type TabKey = "equipo" | "historial";
+type TabKey = "equipo" | "historial" | "ajustes";
 
 export default function UsersScreen() {
   const { colors, typography } = useTheme();
@@ -111,20 +112,21 @@ export default function UsersScreen() {
       {/* Tab switcher */}
       {isSupervisorOrAbove && (
         <View style={[styles.tabBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-          {(["equipo", "historial"] as TabKey[]).map((tab) => (
-            <Pressable
-              key={tab}
-              style={[styles.tabItem, activeTab === tab && { borderBottomColor: colors.gold, borderBottomWidth: 2 }]}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text style={[
-                typography.label,
-                { color: activeTab === tab ? colors.gold : colors.textMuted, fontSize: 12 },
-              ]}>
-                {tab === "equipo" ? "EQUIPO" : "HISTORIAL"}
-              </Text>
-            </Pressable>
-          ))}
+          {(["equipo", "historial", "ajustes"] as TabKey[]).map((tab) => {
+            if (tab === "ajustes" && !isSupervisorOrAbove) return null;
+            const labels: Record<TabKey, string> = { equipo: "EQUIPO", historial: "HISTORIAL", ajustes: "AJUSTES" };
+            return (
+              <Pressable
+                key={tab}
+                style={[styles.tabItem, activeTab === tab && { borderBottomColor: colors.gold, borderBottomWidth: 2 }]}
+                onPress={() => setActiveTab(tab)}
+              >
+                <Text style={[typography.label, { color: activeTab === tab ? colors.gold : colors.textMuted, fontSize: 12 }]}>
+                  {labels[tab]}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       )}
 
@@ -188,8 +190,10 @@ export default function UsersScreen() {
             </Pressable>
           )}
         </>
-      ) : (
+      ) : activeTab === "historial" ? (
         <AuditHistorial />
+      ) : (
+        <SettingsPanel />
       )}
 
       {showCreate && (

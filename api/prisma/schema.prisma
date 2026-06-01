@@ -322,6 +322,19 @@ model BlockedEntity {
   @@map("blocked_entities")
 }
 
+model SystemSetting {
+  id             String   @id @default(uuid())
+  category       String
+  key            String
+  value          String
+  updatedAt      DateTime @updatedAt
+  updatedById    String?
+
+  @@unique([category, key])
+  @@index([category])
+  @@map("system_settings")
+}
+
 model StyleMeta {
   name      String   @id
   imageUri  String?  @db.Text

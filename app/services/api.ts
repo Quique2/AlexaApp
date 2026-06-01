@@ -5,6 +5,8 @@ import {
   AuditGroupedUser,
   BlockedEntity,
   ProductionCalendar,
+  SettingDef,
+  SettingsMap,
   DashboardSummary,
   GenerateOrdersPreview,
   ImportResult,
@@ -317,6 +319,16 @@ export const usersApi = {
       method: "POST",
       body: JSON.stringify({ password }),
     }),
+};
+
+// ─── Settings ────────────────────────────────────────────────────────────────
+export const settingsApi = {
+  all: () => request<SettingsMap>("/settings"),
+  category: (cat: string) => request<{ category: string; settings: SettingDef[] }>(`/settings/${cat}`),
+  update: (category: string, key: string, value: string) =>
+    request<SettingDef>(`/settings/${category}/${key}`, { method: "PUT", body: JSON.stringify({ value }) }),
+  reset: (category: string, key: string) =>
+    request<{ value: string }>(`/settings/reset/${category}/${key}`, { method: "POST" }),
 };
 
 // ─── Audit ───────────────────────────────────────────────────────────────────

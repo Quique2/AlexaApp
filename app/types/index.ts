@@ -25,6 +25,23 @@ export type Role = "DEVELOPER" | "SUPERVISOR" | "OPERATOR" | "TRANSPORTER";
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type BlockType = "EMAIL" | "IP";
 
+export interface SettingDef {
+  key: string;
+  label: string;
+  description?: string;
+  valueType: "number" | "boolean" | "string" | "select";
+  defaultValue: string;
+  value: string;
+  editableByRole: "DEVELOPER" | "SUPERVISOR";
+  options?: string[];
+  min?: number;
+  max?: number;
+  isDefault?: boolean;
+  updatedAt?: string | null;
+}
+
+export type SettingsMap = Record<string, SettingDef[]>;
+
 export type JitStatus = "CRITICAL" | "RED" | "YELLOW" | "GREEN" | "NONE";
 
 export interface CalendarPlan {
