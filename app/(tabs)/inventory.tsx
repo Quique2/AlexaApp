@@ -15,7 +15,7 @@ import { InventoryRow } from "../components/InventoryRow";
 import { AlertBadge } from "../components/AlertBadge";
 import { EmptyState } from "../components/EmptyState";
 import { useInventory, useUpdateInventory } from "../hooks/useInventory";
-import { inventoryApi, materialsApi } from "../services/api";
+import { inventoryApi, materialsApi, getApiToken, getApiBaseUrl } from "../services/api";
 import { fmt } from "../utils/fmt";
 import type { InventoryRow as IRow, MaterialType } from "../types";
 
@@ -51,20 +51,50 @@ export default function InventoryScreen() {
   const [fabOpen, setFabOpen] = useState(false);
 
   const handleDownloadTemplate = async () => {
-    if (Platform.OS !== "web") {
-      Alert.alert("Plantilla", "Descarga disponible solo en web.");
+    if (Platform.OS === "web") {
+      try {
+        const blob = await inventoryApi.downloadTemplate();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "inventario_template.xlsx";
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (e: any) {
+        Alert.alert("Error", e.message);
+      }
+      return;
+    }
+
+    // Mobile: download authenticated file then open share sheet
+    let FileSystem: any, Sharing: any;
+    try {
+      FileSystem = require("expo-file-system/legacy");
+      Sharing = require("expo-sharing");
+    } catch {
+      Alert.alert("Plantilla", "Actualiza la app a la última versión para descargar en móvil.");
       return;
     }
     try {
-      const blob = await inventoryApi.downloadTemplate();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "inventario_template.xlsx";
-      a.click();
-      URL.revokeObjectURL(url);
+      const token = getApiToken();
+      const fileUri = `${FileSystem.cacheDirectory}inventario_template.xlsx`;
+      const { uri, status } = await FileSystem.downloadAsync(
+        `${getApiBaseUrl()}/inventory/template`,
+        fileUri,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      );
+      if (status !== 200) throw new Error("Error al descargar la plantilla");
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          dialogTitle: "Plantilla de inventario",
+          UTI: "org.openxmlformats.spreadsheetml.sheet",
+        });
+      } else {
+        Alert.alert("Plantilla", `Archivo guardado en: ${uri}`);
+      }
     } catch (e: any) {
-      Alert.alert("Error", e.message);
+      Alert.alert("Error", e.message ?? "No se pudo descargar la plantilla");
     }
   };
 
@@ -211,8 +241,42 @@ function ImportModal({ onClose }: { onClose: () => void }) {
         }
       };
       input.click();
-    } else {
-      Alert.alert("Importar Excel", "Importación disponible solo en web.");
+      return;
+    }
+
+    // Mobile: pick a document then upload
+    let DocumentPicker: any;
+    try {
+      DocumentPicker = require("expo-document-picker");
+    } catch {
+      Alert.alert("Importar Excel", "Actualiza la app a la última versión para importar en móvil.");
+      return;
+    }
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({
+        type: [
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.ms-excel",
+        ],
+        copyToCacheDirectory: true,
+      });
+      if (picked.canceled || !picked.assets?.length) return;
+      const asset = picked.assets[0];
+      setImporting(true);
+      try {
+        const res = await inventoryApi.import({
+          uri: asset.uri,
+          name: asset.name ?? "inventario.xlsx",
+          type: asset.mimeType ?? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        setResult(res);
+      } catch (err: any) {
+        Alert.alert("Error", err.message);
+      } finally {
+        setImporting(false);
+      }
+    } catch (e: any) {
+      Alert.alert("Error", e.message ?? "No se pudo importar el archivo");
     }
   };
 
