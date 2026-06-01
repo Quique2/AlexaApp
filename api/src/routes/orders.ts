@@ -4,7 +4,7 @@ import prisma from "../lib/prisma";
 import { z } from "zod";
 import { syncInventoryState, checkAndAutoSignOffPlan, recalculateInventoryAlertStatus } from "../lib/jit";
 import { requireAuth, AuthRequest } from "../middleware/requireAuth";
-import { logAudit } from "../lib/audit";
+import { logAudit, extractIp } from "../lib/audit";
 
 const router = Router();
 
@@ -143,7 +143,15 @@ router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunc
       entityType: "Order",
       entityId: order.id,
       entityName: `${order.folio} · ${order.material.name}`,
-      metadata: { quantity: order.orderedQuantity, unit: order.material.unit },
+      description: `Pedido creado: ${order.folio}`,
+      ipAddress: extractIp(req),
+      changes: [{
+        field: "orderedQuantity",
+        label: "Cantidad",
+        oldValue: 0,
+        newValue: order.orderedQuantity,
+        unit: order.material.unit,
+      }],
     });
     res.status(201).json(order);
   } catch (e) {
@@ -247,7 +255,12 @@ router.patch("/:id/confirm-received", requireAuth, async (req: Request, res: Res
       entityType: "Order",
       entityId: order.id,
       entityName: `${order.folio} · ${order.material.name}`,
-      metadata: { receivedQuantity, totalReceived, status: newStatus, condition, isConforming },
+      description: `Recepción registrada: ${order.folio}`,
+      ipAddress: extractIp(req),
+      changes: [
+        { field: "status", label: "Estado", oldValue: order.status, newValue: newStatus },
+        { field: "receivedQuantity", label: "Cantidad recibida", oldValue: 0, newValue: receivedQuantity, unit: order.material.unit },
+      ],
     });
 
     res.json({ reception, orderStatus: newStatus, totalReceived });

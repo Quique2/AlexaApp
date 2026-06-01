@@ -6,6 +6,7 @@ import { requireAuth, AuthRequest } from "../middleware/requireAuth";
 import { requireRole, RoleRequest } from "../middleware/requireRole";
 import { canModifyUser, canAssignRole, canManageUsers } from "../lib/permissions";
 import type { Role } from "../lib/permissions";
+import { logAudit, extractIp } from "../lib/audit";
 
 const router = Router();
 
@@ -79,6 +80,16 @@ router.post(
         data: { email, passwordHash, name, role: role as any, createdById: actorId },
         select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
       });
+      await logAudit({
+        userId: actorId,
+        action: "USER_CREATED",
+        entityType: "User",
+        entityId: user.id,
+        entityName: name ?? email,
+        description: `Usuario creado: ${name ?? email} (${role})`,
+        ipAddress: extractIp(req),
+        changes: [{ field: "role", label: "Rol", oldValue: null, newValue: role }],
+      });
       res.status(201).json(user);
     } catch (e) { next(e); }
   }
@@ -122,6 +133,25 @@ router.put(
         data: parse.data as any,
         select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
       });
+      const actorId = (req as AuthRequest).userId;
+      const changes = [];
+      if (parse.data.role && parse.data.role !== target.role) {
+        changes.push({ field: "role", label: "Rol", oldValue: target.role, newValue: parse.data.role });
+      }
+      if (parse.data.isActive !== undefined) {
+        changes.push({ field: "isActive", label: "Estado", oldValue: !parse.data.isActive, newValue: parse.data.isActive });
+      }
+      const action = parse.data.isActive === false ? "USER_DEACTIVATED" : parse.data.isActive === true ? "USER_ACTIVATED" : "USER_ROLE_CHANGED";
+      await logAudit({
+        userId: actorId,
+        action,
+        entityType: "User",
+        entityId: req.params.id,
+        entityName: user.name ?? user.email,
+        description: changes.length > 0 ? `Usuario actualizado: ${user.name ?? user.email}` : undefined,
+        ipAddress: extractIp(req),
+        changes: changes.length > 0 ? changes : undefined,
+      });
       res.json(user);
     } catch (e) { next(e); }
   }
@@ -157,6 +187,15 @@ router.post(
       });
       // Invalidate all existing sessions for this user
       await prisma.userSession.deleteMany({ where: { userId: req.params.id } });
+      await logAudit({
+        userId: (req as AuthRequest).userId,
+        action: "PASSWORD_RESET",
+        entityType: "User",
+        entityId: req.params.id,
+        entityName: target ? undefined : req.params.id,
+        description: "Contraseña reseteada por administrador",
+        ipAddress: extractIp(req),
+      });
       res.json({ ok: true });
     } catch (e) { next(e); }
   }

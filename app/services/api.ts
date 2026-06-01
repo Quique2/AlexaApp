@@ -2,6 +2,7 @@ import Constants from "expo-constants";
 import {
   AppUser,
   AuditLog,
+  AuditGroupedUser,
   BlockedEntity,
   DashboardSummary,
   GenerateOrdersPreview,
@@ -309,17 +310,41 @@ export const usersApi = {
 };
 
 // ─── Audit ───────────────────────────────────────────────────────────────────
+type AuditListParams = {
+  limit?: number;
+  offset?: number;
+  userId?: string;
+  search?: string;
+  action?: string;
+  entityType?: string;
+  onlyChanges?: boolean;
+};
+
+function buildAuditQs(params?: AuditListParams): string {
+  if (!params) return "";
+  const qs = new URLSearchParams(
+    Object.entries(params)
+      .filter(([, v]) => v !== undefined && v !== "")
+      .map(([k, v]) => [k, String(v)])
+  ).toString();
+  return qs ? `?${qs}` : "";
+}
+
 export const auditApi = {
-  list: (params?: { limit?: number; offset?: number; userId?: string }) => {
-    const qs = new URLSearchParams(
-      Object.entries(params ?? {})
-        .filter(([, v]) => v !== undefined)
-        .map(([k, v]) => [k, String(v)])
-    ).toString();
-    return request<{ logs: AuditLog[]; total: number; limit: number; offset: number }>(
-      `/audit${qs ? `?${qs}` : ""}`
-    );
-  },
+  list: (params?: AuditListParams) =>
+    request<{ logs: AuditLog[]; total: number; limit: number; offset: number }>(
+      `/audit${buildAuditQs(params)}`
+    ),
+  recent: () => request<AuditLog[]>("/audit/recent"),
+  groupedByUser: () => request<AuditGroupedUser[]>("/audit/grouped-by-user"),
+  listForUser: (userId: string, params?: Omit<AuditListParams, "userId">) =>
+    request<{ logs: AuditLog[]; total: number; limit: number; offset: number }>(
+      `/audit/user/${userId}${buildAuditQs(params)}`
+    ),
+  exportUrl: (params?: AuditListParams) =>
+    `${(typeof process !== "undefined" ? process.env.EXPO_PUBLIC_API_URL : undefined) ?? "https://alexaapp-production.up.railway.app/api"}/audit/export${buildAuditQs(params)}`,
+  exportRaw: (params?: AuditListParams) =>
+    requestRaw(`/audit/export${buildAuditQs(params)}`),
 };
 
 // ─── Admin ───────────────────────────────────────────────────────────────────

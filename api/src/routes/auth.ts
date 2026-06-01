@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import prisma from "../lib/prisma";
 import { requireAuth, AuthRequest } from "../middleware/requireAuth";
 import { getClientIp } from "../middleware/requireActive";
+import { logAudit, extractIp } from "../lib/audit";
 
 const router = Router();
 
@@ -68,7 +69,15 @@ router.post("/register", async (req: Request, res: Response) => {
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await prisma.user.create({ data: { email, passwordHash, name } });
   const { accessToken, refreshToken } = await createSession(user.id);
-
+  await logAudit({
+    userId: user.id,
+    action: "USER_REGISTERED",
+    entityType: "User",
+    entityId: user.id,
+    entityName: name ?? email,
+    description: `Nuevo usuario registrado: ${email}`,
+    ipAddress: extractIp(req),
+  });
   res.status(201).json({
     accessToken,
     refreshToken,
@@ -100,7 +109,15 @@ router.post("/login", async (req: Request, res: Response) => {
   if (!user.isActive) return res.status(403).json({ error: "Cuenta desactivada" });
 
   const { accessToken, refreshToken } = await createSession(user.id);
-
+  await logAudit({
+    userId: user.id,
+    action: "USER_LOGIN",
+    entityType: "User",
+    entityId: user.id,
+    entityName: user.name ?? user.email,
+    description: `Inicio de sesión: ${user.email}`,
+    ipAddress: extractIp(req),
+  });
   res.json({
     accessToken,
     refreshToken,
@@ -154,7 +171,18 @@ router.post("/biometric-token", requireAuth, async (req: Request, res: Response)
 router.post("/logout", async (req: Request, res: Response) => {
   const { refreshToken } = req.body;
   if (refreshToken) {
+    const session = await prisma.userSession.findUnique({ where: { refreshToken } }).catch(() => null);
     await prisma.userSession.deleteMany({ where: { refreshToken } }).catch(() => {});
+    if (session?.userId) {
+      await logAudit({
+        userId: session.userId,
+        action: "USER_LOGOUT",
+        entityType: "User",
+        entityId: session.userId,
+        description: "Cierre de sesión",
+        ipAddress: extractIp(req),
+      });
+    }
   }
   res.json({ ok: true });
 });

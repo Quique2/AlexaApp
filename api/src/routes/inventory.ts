@@ -7,7 +7,7 @@ import multer from "multer";
 import { requireAuth, AuthRequest } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
 import { syncInventoryState, roundQty } from "../lib/jit";
-import { logAudit } from "../lib/audit";
+import { logAudit, extractIp } from "../lib/audit";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -256,7 +256,15 @@ router.put("/:materialId", requireAuth, async (req: Request, res: Response, next
         entityType: "Inventory",
         entityId: current.id,
         entityName: updated.material.name,
-        metadata: { before: current.currentStock, after: updated.currentStock, unit: updated.material.unit },
+        description: `Stock actualizado: ${updated.material.name}`,
+        ipAddress: extractIp(req),
+        changes: [{
+          field: "currentStock",
+          label: "Stock",
+          oldValue: current.currentStock,
+          newValue: updated.currentStock,
+          unit: updated.material.unit,
+        }],
       });
     }
 

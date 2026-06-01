@@ -280,18 +280,23 @@ model User {
 }
 
 model AuditLog {
-  id         String   @id @default(uuid())
-  userId     String?
-  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  action     String
-  entityType String
-  entityId   String?
-  entityName String?
-  metadata   Json?
-  createdAt  DateTime @default(now())
+  id          String   @id @default(uuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action      String
+  entityType  String
+  entityId    String?
+  entityName  String?
+  description String?
+  ipAddress   String?
+  changes     Json?
+  metadata    Json?
+  createdAt   DateTime @default(now())
 
   @@index([createdAt(sort: Desc)])
   @@index([userId])
+  @@index([action])
+  @@index([entityType])
   @@map("audit_logs")
 }
 

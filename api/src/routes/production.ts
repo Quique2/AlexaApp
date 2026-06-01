@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import prisma from "../lib/prisma";
 import { z } from "zod";
 import { requireAuth, AuthRequest } from "../middleware/requireAuth";
-import { logAudit } from "../lib/audit";
+import { logAudit, extractIp } from "../lib/audit";
 import { requireRole } from "../middleware/requireRole";
 import { canApproveProduction } from "../lib/permissions";
 import type { Role } from "../lib/permissions";
@@ -209,7 +209,9 @@ router.post("/", requireAuth, async (req: Request, res: Response, next: NextFunc
       entityType: "ProductionPlan",
       entityId: plan.id,
       entityName: `${plan.style} · ${plan.plannedBatches} lote(s)`,
-      metadata: { style: plan.style, batches: plan.plannedBatches, productionDate: plan.productionDate, approvalStatus },
+      description: `Plan de producción creado: ${plan.style}`,
+      ipAddress: extractIp(req),
+      changes: [{ field: "approvalStatus", label: "Estado aprobación", oldValue: null, newValue: approvalStatus }],
     });
 
     res.status(201).json(plan);
@@ -260,6 +262,9 @@ router.post(
         entityType: "ProductionPlan",
         entityId: plan.id,
         entityName: `${plan.style} · ${plan.plannedBatches} lote(s)`,
+        description: `Plan aprobado: ${plan.style}`,
+        ipAddress: extractIp(req),
+        changes: [{ field: "approvalStatus", label: "Estado aprobación", oldValue: "PENDING", newValue: "APPROVED" }],
       });
 
       res.json(updated);
@@ -299,7 +304,9 @@ router.post(
         entityType: "ProductionPlan",
         entityId: plan.id,
         entityName: `${plan.style} · ${plan.plannedBatches} lote(s)`,
-        metadata: { reason: reason ?? null },
+        description: `Plan rechazado: ${plan.style}${reason ? ` — ${reason}` : ""}`,
+        ipAddress: extractIp(req),
+        changes: [{ field: "approvalStatus", label: "Estado aprobación", oldValue: "PENDING", newValue: "REJECTED" }],
       });
       res.json(updated);
     } catch (e) {
@@ -359,6 +366,8 @@ router.post(
         entityType: "ProductionPlan",
         entityId: plan.id,
         entityName: `${plan.style} · ${plan.plannedBatches} lote(s)`,
+        description: `Visto bueno otorgado: ${plan.style}`,
+        ipAddress: extractIp(req),
       });
 
       res.json(updated);
@@ -399,7 +408,9 @@ router.patch(
         entityType: "ProductionPlan",
         entityId: plan.id,
         entityName: `${plan.style} · ${plan.plannedBatches} lote(s)`,
-        metadata: { before: plan.productionStatus, after: productionStatus },
+        description: `Estado de producción: ${plan.style} → ${productionStatus}`,
+        ipAddress: extractIp(req),
+        changes: [{ field: "productionStatus", label: "Estado producción", oldValue: plan.productionStatus, newValue: productionStatus }],
       });
 
       res.json(updated);

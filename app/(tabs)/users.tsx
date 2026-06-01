@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import {
   View, Text, StyleSheet, Pressable, Modal,
   ScrollView, TextInput, ActivityIndicator, RefreshControl, Alert,
-  KeyboardAvoidingView, Platform, SectionList, FlatList,
+  KeyboardAvoidingView, Platform, SectionList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { spacing, radius, Colors } from "../constants/theme";
@@ -12,8 +12,9 @@ import { EmptyState } from "../components/EmptyState";
 import { SectionHeader } from "../components/SectionHeader";
 import { useUsers, useCreateUser, useUpdateUser, useResetPassword } from "../hooks/useUsers";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { adminApi, auditApi } from "../services/api";
-import type { AppUser, AuditLog, Role, BlockedEntity } from "../types";
+import { adminApi } from "../services/api";
+import { AuditHistorial } from "../components/AuditHistorial";
+import type { AppUser, Role, BlockedEntity } from "../types";
 
 const ROLE_LABELS: Record<Role, string> = {
   DEVELOPER: "Developer",
@@ -55,12 +56,6 @@ export default function UsersScreen() {
     queryKey: ["blocked"],
     queryFn: adminApi.listBlocked,
     enabled: isDeveloper,
-  });
-
-  const { data: auditData, isLoading: auditLoading, refetch: refetchAudit, isRefetching: isRefetchingAudit } = useQuery({
-    queryKey: ["audit"],
-    queryFn: () => auditApi.list({ limit: 100 }),
-    enabled: isSupervisorOrAbove && activeTab === "historial",
   });
 
   const unblockMutation = useMutation({
@@ -194,14 +189,7 @@ export default function UsersScreen() {
           )}
         </>
       ) : (
-        <HistorialTab
-          logs={auditData?.logs ?? []}
-          isLoading={auditLoading}
-          isRefetching={isRefetchingAudit}
-          onRefresh={refetchAudit}
-          colors={colors}
-          typography={typography}
-        />
+        <AuditHistorial />
       )}
 
       {showCreate && (
@@ -229,155 +217,6 @@ export default function UsersScreen() {
     </View>
   );
 }
-
-const AUDIT_META: Record<string, { icon: string; color: (c: Colors) => string; label: (log: AuditLog) => string }> = {
-  INVENTORY_STOCK_UPDATE: {
-    icon: "cube-outline",
-    color: (_c) => "#4DA6FF",
-    label: (l) => {
-      const m = l.metadata;
-      return `Stock: ${m?.before ?? "?"} → ${m?.after ?? "?"} ${m?.unit ?? ""}`;
-    },
-  },
-  PRICE_UPDATE: {
-    icon: "pricetag-outline",
-    color: (c) => c.gold,
-    label: (l) => {
-      const m = l.metadata;
-      return `Precio: $${m?.before ?? "?"} → $${m?.after ?? "?"} MXN`;
-    },
-  },
-  ORDER_CREATED: {
-    icon: "cart-outline",
-    color: (c) => c.green,
-    label: (l) => {
-      const m = l.metadata;
-      return `Pedido creado: ${m?.quantity ?? "?"} ${m?.unit ?? ""}`;
-    },
-  },
-  ORDER_RECEIVED: {
-    icon: "checkmark-circle-outline",
-    color: (c) => c.green,
-    label: (l) => {
-      const m = l.metadata;
-      return `Recepción: ${m?.receivedQuantity ?? "?"} recibidos · ${m?.condition ?? ""}`;
-    },
-  },
-  PLAN_CREATED: {
-    icon: "flask-outline",
-    color: (c) => c.gold,
-    label: () => "Plan de producción creado",
-  },
-  PLAN_APPROVED: {
-    icon: "shield-checkmark-outline",
-    color: (c) => c.green,
-    label: () => "Plan aprobado",
-  },
-  PLAN_REJECTED: {
-    icon: "close-circle-outline",
-    color: (c) => c.red,
-    label: (l) => `Plan rechazado${l.metadata?.reason ? `: ${l.metadata.reason}` : ""}`,
-  },
-  PLAN_SIGNED_OFF: {
-    icon: "ribbon-outline",
-    color: (c) => c.gold,
-    label: () => "Visto bueno otorgado",
-  },
-  PLAN_STATUS_CHANGED: {
-    icon: "refresh-outline",
-    color: (c) => c.textSecondary,
-    label: (l) => {
-      const m = l.metadata;
-      const labels: Record<string, string> = { IN_PROGRESS: "En progreso", COMPLETED: "Completado", CANCELLED: "Cancelado" };
-      return `Estado: ${labels[m?.after] ?? m?.after ?? "?"}`;
-    },
-  },
-};
-
-function formatRelativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "ahora";
-  if (mins < 60) return `hace ${mins} min`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `hace ${hrs} h`;
-  const days = Math.floor(hrs / 24);
-  return `hace ${days} d`;
-}
-
-function HistorialTab({
-  logs, isLoading, isRefetching, onRefresh, colors, typography,
-}: {
-  logs: AuditLog[];
-  isLoading: boolean;
-  isRefetching: boolean;
-  onRefresh: () => void;
-  colors: Colors;
-  typography: any;
-}) {
-  if (isLoading) {
-    return <ActivityIndicator color={colors.gold} style={{ marginTop: spacing.xl }} />;
-  }
-
-  return (
-    <FlatList
-      data={logs}
-      keyExtractor={(item) => item.id}
-      refreshControl={
-        <RefreshControl refreshing={isRefetching} onRefresh={onRefresh} tintColor={colors.gold} />
-      }
-      ListEmptyComponent={
-        <EmptyState icon="📋" title="Sin actividad" subtitle="Los movimientos importantes aparecerán aquí" />
-      }
-      renderItem={({ item }) => {
-        const meta = AUDIT_META[item.action];
-        const iconName = (meta?.icon ?? "ellipse-outline") as any;
-        const iconColor = meta ? meta.color(colors) : colors.textMuted;
-        const description = meta ? meta.label(item) : item.action;
-        const userName = item.user?.name ?? item.user?.email ?? "Sistema";
-
-        return (
-          <View style={[auditStyles.row, { borderBottomColor: colors.border }]}>
-            <View style={[auditStyles.iconWrap, { backgroundColor: iconColor + "18" }]}>
-              <Ionicons name={iconName} size={18} color={iconColor} />
-            </View>
-            <View style={auditStyles.content}>
-              <Text style={[typography.bodySmall, { color: colors.textPrimary, fontWeight: "600" }]} numberOfLines={1}>
-                {item.entityName ?? item.entityType}
-              </Text>
-              <Text style={[typography.caption, { color: colors.textSecondary }]} numberOfLines={2}>
-                {description}
-              </Text>
-              <View style={auditStyles.meta}>
-                <Text style={[typography.label, { fontSize: 10, color: colors.textMuted }]}>{userName}</Text>
-                <Text style={[typography.label, { fontSize: 10, color: colors.textMuted }]}>·</Text>
-                <Text style={[typography.label, { fontSize: 10, color: colors.textMuted }]}>{formatRelativeTime(item.createdAt)}</Text>
-              </View>
-            </View>
-          </View>
-        );
-      }}
-    />
-  );
-}
-
-const auditStyles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    borderBottomWidth: 1,
-    gap: spacing.sm,
-  },
-  iconWrap: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: "center", justifyContent: "center",
-    marginTop: 2,
-  },
-  content: { flex: 1, gap: 2 },
-  meta: { flexDirection: "row", gap: spacing.xs, alignItems: "center", marginTop: 2 },
-});
 
 function UserRow({
   user, colors, typography, onEdit, onResetPassword, onToggleActive,

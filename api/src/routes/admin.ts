@@ -1,8 +1,9 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import prisma from "../lib/prisma";
-import { requireAuth } from "../middleware/requireAuth";
+import { requireAuth, AuthRequest } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
+import { logAudit, extractIp } from "../lib/audit";
 
 const router = Router();
 
@@ -43,6 +44,15 @@ router.post(
         create: parse.data as any,
         update: { reason: parse.data.reason },
       });
+      await logAudit({
+        userId: (req as AuthRequest).userId,
+        action: "ENTITY_BLOCKED",
+        entityType: "BlockedEntity",
+        entityId: entity.id,
+        entityName: `${parse.data.type}: ${parse.data.value}`,
+        description: `Bloqueado ${parse.data.type === "EMAIL" ? "correo" : "IP"}: ${parse.data.value}`,
+        ipAddress: extractIp(req),
+      });
       res.status(201).json(entity);
     } catch (e) { next(e); }
   }
@@ -55,7 +65,17 @@ router.delete(
   requireRole("DEVELOPER"),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const entity = await prisma.blockedEntity.findUnique({ where: { id: req.params.id } });
       await prisma.blockedEntity.delete({ where: { id: req.params.id } });
+      await logAudit({
+        userId: (req as AuthRequest).userId,
+        action: "ENTITY_UNBLOCKED",
+        entityType: "BlockedEntity",
+        entityId: req.params.id,
+        entityName: entity ? `${entity.type}: ${entity.value}` : req.params.id,
+        description: entity ? `Desbloqueado ${entity.type === "EMAIL" ? "correo" : "IP"}: ${entity.value}` : undefined,
+        ipAddress: extractIp(req),
+      });
       res.status(204).send();
     } catch (e) { next(e); }
   }

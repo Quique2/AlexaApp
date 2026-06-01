@@ -25,6 +25,14 @@ export type Role = "DEVELOPER" | "SUPERVISOR" | "OPERATOR" | "TRANSPORTER";
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
 export type BlockType = "EMAIL" | "IP";
 
+export interface AuditChange {
+  field: string;
+  label: string;
+  oldValue: any;
+  newValue: any;
+  unit?: string;
+}
+
 export interface AuditLog {
   id: string;
   userId: string | null;
@@ -33,8 +41,18 @@ export interface AuditLog {
   entityType: string;
   entityId: string | null;
   entityName: string | null;
+  description: string | null;
+  ipAddress: string | null;
+  changes: AuditChange[] | null;
   metadata: Record<string, any> | null;
   createdAt: string;
+}
+
+export interface AuditGroupedUser {
+  userId: string | null;
+  user: { id: string; name: string | null; email: string; role: Role } | null;
+  count: number;
+  lastActivity: string | null;
 }
 
 export interface Supplier {

@@ -4,7 +4,7 @@ import prisma from "../lib/prisma";
 import { z } from "zod";
 import { requireAuth, AuthRequest } from "../middleware/requireAuth";
 import { requireRole } from "../middleware/requireRole";
-import { logAudit } from "../lib/audit";
+import { logAudit, extractIp } from "../lib/audit";
 
 const router = Router();
 
@@ -104,7 +104,15 @@ router.put(
         entityType: "Material",
         entityId: material.id,
         entityName: material.name,
-        metadata: { before: existing?.unitPrice ?? 0, after: unitPrice, unit: priceUnit ?? material.priceUnit },
+        description: `Precio actualizado: ${material.name}`,
+        ipAddress: extractIp(req),
+        changes: [{
+          field: "unitPrice",
+          label: "Precio",
+          oldValue: existing?.unitPrice ?? 0,
+          newValue: unitPrice,
+          unit: priceUnit ?? material.priceUnit ?? "MXN",
+        }],
       });
       res.json(material);
     } catch (e) { next(e); }
