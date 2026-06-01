@@ -303,15 +303,6 @@ export function SettingsPanel() {
           typography={typography}
         />
 
-        {/* Category note */}
-        <View style={{ padding: spacing.md, gap: spacing.xs }}>
-          {["security","dashboard","inventory"].includes(activeCategory) && (
-            <Text style={[typography.caption, { color: colors.textMuted, textAlign: "center" }]}>
-              Los ajustes de esta sección se guardan pero aún no afectan el comportamiento de la app. Se conectarán en versiones futuras.
-            </Text>
-          )}
-        </View>
-
         <View style={{ height: spacing.xxl }} />
       </ScrollView>
 
