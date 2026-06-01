@@ -102,7 +102,14 @@ export const authApi = {
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 export const dashboardApi = {
-  summary: () => request<DashboardSummary>("/dashboard/summary"),
+  summary: (params?: { from?: string; to?: string; materialType?: string }) => {
+    const qs = params
+      ? "?" + new URLSearchParams(
+          Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][]
+        ).toString()
+      : "";
+    return request<DashboardSummary>(`/dashboard/summary${qs}`);
+  },
   spend: () => request<{ month: string; total: number; orders: number }[]>("/dashboard/spend"),
   jitSummary: () => request<JITSummary>("/dashboard/jit-summary"),
 };

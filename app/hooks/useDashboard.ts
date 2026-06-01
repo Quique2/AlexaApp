@@ -1,10 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { dashboardApi } from "../services/api";
 
-export function useDashboardSummary() {
+export interface DashboardParams {
+  from: string;
+  to: string;
+  materialType?: string;
+}
+
+export function useDashboardSummary(params?: DashboardParams) {
   return useQuery({
-    queryKey: ["dashboard", "summary"],
-    queryFn: dashboardApi.summary,
+    queryKey: ["dashboard", "summary", params],
+    queryFn: () => dashboardApi.summary(params),
     refetchInterval: 60_000,
   });
 }

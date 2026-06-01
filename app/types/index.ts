@@ -253,6 +253,8 @@ export interface DashboardSummary {
     batches: number;
     maltKg: number;
     hopKg: number;
+    materialKg: number;
+    materialType: string;
   };
   monthlySpend: { total: number; orderCount: number };
   inTransitOrders: number;

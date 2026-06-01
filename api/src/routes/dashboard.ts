@@ -4,30 +4,32 @@ import prisma from "../lib/prisma";
 const router = Router();
 
 // GET /api/dashboard/summary — main KPIs
-router.get("/summary", async (_req: Request, res: Response, next: NextFunction) => {
+// Optional query params: from (ISO date), to (ISO date), materialType (MALTA|LUPULO|YEAST|ADJUNTO|OTRO)
+router.get("/summary", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const now = new Date();
-    // Use start-of-today (UTC) so plans scheduled for today aren't missed due to
-    // timezone offsets between the server and where production dates are stored
     const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    const in7 = new Date(startOfToday.getTime() + 7 * 86_400_000);
+
+    const from = req.query.from ? new Date(String(req.query.from)) : startOfToday;
+    const to = req.query.to
+      ? new Date(new Date(String(req.query.to)).setUTCHours(23, 59, 59, 999))
+      : new Date(startOfToday.getTime() + 7 * 86_400_000);
+    const materialType = req.query.materialType ? String(req.query.materialType) : null;
 
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-    const [alertCounts, criticalCount, reservedCount, totalMaterials, upcomingPlans, monthlySpend, inTransit] =
+    const [alertCounts, reservedCount, totalMaterials, upcomingPlans, monthlySpend, inTransit] =
       await Promise.all([
         prisma.inventory.groupBy({
           by: ["alertStatus"],
           _count: { alertStatus: true },
         }),
-        prisma.inventory.count({ where: { isCritical: true } }),
-        // Materials reserved for a signed-off production plan (visto bueno)
         prisma.inventory.count({ where: { reservedStock: { gt: 0 } } }),
         prisma.material.count(),
         prisma.productionPlan.findMany({
           where: {
-            productionDate: { gte: startOfToday, lte: in7 },
+            productionDate: { gte: from, lte: to },
             productionStatus: { notIn: ["COMPLETED", "CANCELLED"] },
           },
           include: {
@@ -53,9 +55,25 @@ router.get("/summary", async (_req: Request, res: Response, next: NextFunction) 
       alertCounts.map((a) => [a.alertStatus, a._count.alertStatus])
     );
 
+    const planIds = upcomingPlans.map((p) => p.id);
     const upcomingBatches = upcomingPlans.reduce((acc, p) => acc + p.plannedBatches, 0);
     const upcomingMaltKg = upcomingPlans.reduce((acc, p) => acc + p.totalMaltKg, 0);
     const upcomingHopKg = upcomingPlans.reduce((acc, p) => acc + p.totalHopKg, 0);
+
+    // Material KPI: sum required quantity for the selected type across all plans in range
+    let materialKg = 0;
+    if (materialType && planIds.length > 0) {
+      const reqs = await prisma.productionRequirement.aggregate({
+        where: {
+          productionPlanId: { in: planIds },
+          material: { type: materialType as any },
+        },
+        _sum: { requiredQuantity: true },
+      });
+      materialKg = reqs._sum.requiredQuantity ?? 0;
+    } else if (!materialType && planIds.length > 0) {
+      materialKg = upcomingMaltKg;
+    }
 
     res.json({
       alerts: {
@@ -75,6 +93,8 @@ router.get("/summary", async (_req: Request, res: Response, next: NextFunction) 
         batches: upcomingBatches,
         maltKg: upcomingMaltKg,
         hopKg: upcomingHopKg,
+        materialKg,
+        materialType: materialType ?? "MALTA",
       },
       monthlySpend: {
         total: monthlySpend._sum.totalPaid ?? 0,
