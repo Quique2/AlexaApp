@@ -9,15 +9,20 @@ async function main() {
   });
   console.log(`Set ${userCount} users to OPERATOR`);
 
-  // Elevate the developer account
-  const dev = await prisma.user.updateMany({
-    where: { email: "kiki7o@outlook.es" },
-    data: { role: "DEVELOPER" },
-  });
-  if (dev.count > 0) {
-    console.log("Set kiki7o@outlook.es to DEVELOPER");
+  // Elevate the developer account (set DEVELOPER_EMAIL in the environment)
+  const developerEmail = process.env.DEVELOPER_EMAIL;
+  if (!developerEmail) {
+    console.warn("DEVELOPER_EMAIL not set — no account was elevated to DEVELOPER");
   } else {
-    console.warn("Developer user kiki7o@outlook.es not found — skipped");
+    const dev = await prisma.user.updateMany({
+      where: { email: developerEmail },
+      data: { role: "DEVELOPER" },
+    });
+    if (dev.count > 0) {
+      console.log(`Set ${developerEmail} to DEVELOPER`);
+    } else {
+      console.warn(`Developer user ${developerEmail} not found — skipped`);
+    }
   }
 
   // Mark all existing production plans as APPROVED (they were created before approval flow)
